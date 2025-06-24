@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'screens/home_screen.dart';
+// import 'screens/home_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/settings/settings_screens.dart';
 import 'screens/ai_chat_screen.dart';
