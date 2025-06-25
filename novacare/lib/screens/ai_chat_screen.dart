@@ -21,9 +21,16 @@ class _AiChatScreenState extends State<AiChatScreen>
   bool _isBotTyping = false;
   late AnimationController _typingAnimationController;
 
-  // Enhanced API configuration
   final String apiUrl = 'http://172.16.5.48:8000/webhook';
+  final String symptomsUrl = 'http://172.16.5.48:8000/symptoms';
 
+  // State management
+  bool isStartPhase = true;
+  bool isSymptomPhase = false;
+  bool isLoading = false;
+  List<String> availableSymptoms = [];
+  List<String> selectedSymptoms = [];
+  String? errorMessage;
 
   @override
   void initState() {
@@ -32,9 +39,13 @@ class _AiChatScreenState extends State<AiChatScreen>
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat();
-    
-    // Add welcome message
+
     _addWelcomeMessage();
+    
+    // Listen for text changes to enable/disable send button
+    _controller.addListener(() {
+      setState(() {});
+    });
   }
 
   @override
@@ -50,42 +61,125 @@ class _AiChatScreenState extends State<AiChatScreen>
     setState(() {
       _messages.add({
         'role': 'bot',
-        'text': 'Hello! I\'m your AI assistant. How can I help you today?',
+        'text': 'Hello! I\'m your AI medical assistant. I\'ll help you understand your symptoms and provide preliminary guidance. Please note that this is not a substitute for professional medical advice.',
         'timestamp': DateTime.now(),
+        'type': 'start',
       });
     });
   }
 
-  Future<String> sendToBackend(String userMessage) async {
-  try {
-    final response = await http.post(
-      Uri.parse(apiUrl),
-      headers: <String, String>{ // ✅ explicit type
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'queryResult': {
-          'queryText': userMessage,
-        }
-      }),
-    ).timeout(const Duration(seconds: 30));
+  Future<void> fetchSymptoms() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['fulfillmentText'] ?? 'I apologize, but I couldn\'t generate a response. Please try again.';
-    } else {
-      return 'I\'m having trouble connecting to my servers. Please check your connection and try again.';
+    try {
+      final response = await http.get(
+        Uri.parse(symptomsUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          availableSymptoms = List<String>.from(data);
+          isStartPhase = false;
+          isSymptomPhase = true;
+          isLoading = false;
+        });
+        
+        // Add a bot message to guide the user
+        _addBotMessage('Please select all symptoms you\'re experiencing from the list below. You can select multiple symptoms.');
+      } else {
+        throw Exception('Server returned ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Unable to load symptoms. Please check your connection and try again.';
+        isLoading = false;
+      });
+      debugPrint("Error fetching symptoms: $e");
     }
-  } catch (e) {
-    return 'Sorry, I\'m temporarily unavailable. Please try again in a moment.';
   }
-}
 
+  void _addBotMessage(String text) {
+    setState(() {
+      _messages.add({
+        'role': 'bot',
+        'text': text,
+        'timestamp': DateTime.now(),
+      });
+    });
+    _scrollToBottom();
+  }
+
+  void _toggleSymptom(String symptom) {
+    setState(() {
+      if (selectedSymptoms.contains(symptom)) {
+        selectedSymptoms.remove(symptom);
+      } else {
+        selectedSymptoms.add(symptom);
+      }
+    });
+    HapticFeedback.selectionClick();
+  }
+
+  void _sendSymptoms() {
+    if (selectedSymptoms.isEmpty) {
+      _addBotMessage('Please select at least one symptom before proceeding.');
+      return;
+    }
+
+    final message = 'My symptoms are: ${selectedSymptoms.join(', ')}';
+    _sendMessage(message);
+    
+    setState(() {
+      selectedSymptoms.clear();
+      isSymptomPhase = false;
+    });
+  }
+
+  void _skipSymptomSelection() {
+    setState(() {
+      isSymptomPhase = false;
+    });
+    _addBotMessage('No problem! You can describe your symptoms in your own words. How can I help you today?');
+  }
+
+  Future<String> sendToBackend(String userMessage) async {
+    try {
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: <String, String>{
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          'queryResult': {
+            'queryText': userMessage,
+          }
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['fulfillmentText'] ?? 'I apologize, but I couldn\'t process your request properly. Could you please rephrase your question?';
+      } else {
+        return 'I\'m experiencing some technical difficulties. Please try again in a moment.';
+      }
+    } catch (e) {
+      debugPrint('Backend error: $e');
+      return 'I\'m temporarily unavailable. Please check your internet connection and try again.';
+    }
+  }
 
   void _sendMessage(String message) async {
     if (message.trim().isEmpty) return;
 
-    // Haptic feedback
     HapticFeedback.lightImpact();
 
     final userMessage = {
@@ -104,7 +198,9 @@ class _AiChatScreenState extends State<AiChatScreen>
 
     try {
       String botResponse = await sendToBackend(message);
-      
+
+      await Future.delayed(const Duration(milliseconds: 500)); // Simulate thinking time
+
       setState(() {
         _messages.add({
           'role': 'bot',
@@ -117,7 +213,7 @@ class _AiChatScreenState extends State<AiChatScreen>
       setState(() {
         _messages.add({
           'role': 'bot',
-          'text': 'I encountered an error while processing your request. Please try again.',
+          'text': 'I apologize for the inconvenience. There was an error processing your request. Please try again.',
           'timestamp': DateTime.now(),
         });
         _isBotTyping = false;
@@ -139,6 +235,200 @@ class _AiChatScreenState extends State<AiChatScreen>
     });
   }
 
+  Widget _buildStartButton() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isLoading)
+            const Column(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Loading symptoms...'),
+              ],
+            )
+          else if (errorMessage != null)
+            Column(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: fetchSymptoms,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Try Again'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            )
+          else
+            ElevatedButton.icon(
+              onPressed: fetchSymptoms,
+              icon: const Icon(Icons.medical_services),
+              label: const Text('Start Symptom Check'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSymptomSelector() {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.6, // Constrain height
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header - Fixed at top
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                const Icon(Icons.checklist, color: Colors.blue),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Select your symptoms:',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _skipSymptomSelection,
+                  child: const Text('Skip'),
+                ),
+              ],
+            ),
+          ),
+          
+          // Scrollable symptoms area
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: availableSymptoms.map((symptom) {
+                  final selected = selectedSymptoms.contains(symptom);
+                  return FilterChip(
+                    label: Text(symptom),
+                    selected: selected,
+                    onSelected: (_) => _toggleSymptom(symptom),
+                    selectedColor: Colors.blue.shade100,
+                    checkmarkColor: Colors.blue.shade700,
+                    backgroundColor: Colors.grey.shade100,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(
+                        color: selected ? Colors.blue.shade300 : Colors.transparent,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          
+          // Footer - Fixed at bottom
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: Colors.grey.shade200),
+              ),
+            ),
+            child: Column(
+              children: [
+                if (selectedSymptoms.isNotEmpty) ...[
+                  Text(
+                    '${selectedSymptoms.length} sympt${selectedSymptoms.length == 1 ? '' : 's'} selected',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    if (selectedSymptoms.isNotEmpty)
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                selectedSymptoms.clear();
+                              });
+                            },
+                            icon: const Icon(Icons.clear, size: 18),
+                            label: const Text('Clear All'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey.shade300,
+                              foregroundColor: Colors.grey.shade700,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          left: selectedSymptoms.isNotEmpty ? 8 : 0,
+                        ),
+                        child: ElevatedButton.icon(
+                          onPressed: selectedSymptoms.isNotEmpty ? _sendSymptoms : null,
+                          icon: const Icon(Icons.send, size: 18),
+                          label: Text(selectedSymptoms.isEmpty 
+                              ? 'Select symptoms' 
+                              : 'Continue (${selectedSymptoms.length})'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: selectedSymptoms.isNotEmpty 
+                                ? Colors.green 
+                                : Colors.grey.shade300,
+                            foregroundColor: selectedSymptoms.isNotEmpty 
+                                ? Colors.white 
+                                : Colors.grey.shade500,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTypingIndicator() {
     return Align(
       alignment: Alignment.centerLeft,
@@ -153,43 +443,29 @@ class _AiChatScreenState extends State<AiChatScreen>
             bottomRight: Radius.circular(20),
             bottomLeft: Radius.circular(4),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedBuilder(
-              animation: _typingAnimationController,
-              builder: (context, child) {
-                return Row(
-                  children: List.generate(3, (index) {
-                    return AnimatedContainer(
-                      duration: Duration(milliseconds: 300 + (index * 100)),
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      height: 8,
-                      width: 8,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(
-                          ((_typingAnimationController.value + (index * 0.3)) % 1.0) > 0.5
-                              ? 0.7
-                              : 0.3,
-                        ),
-                        shape: BoxShape.circle,
-                      ),
-                    );
-                  }),
-                );
-              },
-            ),
-            const SizedBox(width: 8),
+            ...List.generate(3, (index) {
+              return AnimatedContainer(
+                duration: Duration(milliseconds: 300 + (index * 100)),
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                height: 8,
+                width: 8,
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(
+                    ((_typingAnimationController.value + (index * 0.3)) % 1.0) > 0.5
+                        ? 0.8
+                        : 0.3,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+              );
+            }),
+            const SizedBox(width: 12),
             Text(
-              'AI is thinking...',
+              'AI is analyzing...',
               style: TextStyle(
                 color: Colors.grey.shade600,
                 fontSize: 14,
@@ -203,9 +479,36 @@ class _AiChatScreenState extends State<AiChatScreen>
   }
 
   Widget _buildMessage(Map<String, dynamic> msg, int index) {
+    if (msg['type'] == 'start') {
+      return Container(
+        margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.blue.shade100),
+        ),
+        child: Column(
+          children: [
+            Text(
+              msg['text'],
+              style: TextStyle(
+                color: Colors.blue.shade800,
+                fontSize: 15,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            _buildStartButton(),
+          ],
+        ),
+      );
+    }
+
     final isUser = msg['role'] == 'user';
     final timestamp = msg['timestamp'] as DateTime;
-    
+
     return AnimatedContainer(
       duration: Duration(milliseconds: 300 + (index * 50)),
       curve: Curves.easeOut,
@@ -216,7 +519,8 @@ class _AiChatScreenState extends State<AiChatScreen>
         bottom: 12,
       ),
       child: Column(
-        crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment:
+            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -243,31 +547,21 @@ class _AiChatScreenState extends State<AiChatScreen>
                 ),
               ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  msg['text']!,
-                  style: TextStyle(
-                    color: isUser ? Colors.white : Colors.grey.shade800,
-                    fontSize: 15,
-                    height: 1.4,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
+            child: Text(
+              msg['text'],
+              style: TextStyle(
+                color: isUser ? Colors.white : Colors.grey.shade800,
+                fontSize: 15,
+                height: 1.4,
+              ),
             ),
           ),
           const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              _formatTime(timestamp),
-              style: TextStyle(
-                color: Colors.grey.shade500,
-                fontSize: 11,
-                fontWeight: FontWeight.w400,
-              ),
+          Text(
+            _formatTime(timestamp),
+            style: TextStyle(
+              color: Colors.grey.shade500,
+              fontSize: 11,
             ),
           ),
         ],
@@ -278,7 +572,7 @@ class _AiChatScreenState extends State<AiChatScreen>
   String _formatTime(DateTime time) {
     final now = DateTime.now();
     final difference = now.difference(time);
-    
+
     if (difference.inMinutes < 1) {
       return 'Just now';
     } else if (difference.inHours < 1) {
@@ -292,13 +586,13 @@ class _AiChatScreenState extends State<AiChatScreen>
 
   Widget _buildInputArea() {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black12,
             blurRadius: 10,
-            offset: const Offset(0, -5),
+            offset: Offset(0, -5),
           ),
         ],
       ),
@@ -308,75 +602,52 @@ class _AiChatScreenState extends State<AiChatScreen>
           child: Row(
             children: [
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(25),
-                    border: Border.all(
-                      color: Colors.grey.shade200,
-                      width: 1,
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _textFieldFocus,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: _sendMessage,
+                  maxLines: null,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    hintText: 'Describe your symptoms or ask a question...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25),
+                      borderSide: BorderSide.none,
                     ),
-                  ),
-                  child: TextField(
-                    controller: _controller,
-                    focusNode: _textFieldFocus,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: _sendMessage,
-                    maxLines: null,
-                    keyboardType: TextInputType.multiline,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: InputDecoration(
-                      hintText: "Type your message...",
-                      hintStyle: TextStyle(
-                        color: Colors.grey.shade500,
-                        fontSize: 15,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      border: InputBorder.none,
-                      suffixIcon: _controller.text.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                              onPressed: () {
-                                _controller.clear();
-                                setState(() {});
-                              },
-                            )
-                          : null,
-                    ),
-                    onChanged: (text) {
-                      setState(() {});
-                    },
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                    suffixIcon: _controller.text.isNotEmpty
+                        ? IconButton(
+                            onPressed: () {
+                              _controller.clear();
+                              setState(() {});
+                            },
+                            icon: const Icon(Icons.clear, size: 20),
+                          )
+                        : null,
                   ),
                 ),
               ),
               const SizedBox(width: 12),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                child: Material(
-                  color: _controller.text.trim().isNotEmpty
-                      ? Colors.blue.shade600
+              ElevatedButton(
+                onPressed: !_isBotTyping && _controller.text.trim().isNotEmpty
+                    ? () => _sendMessage(_controller.text)
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  shape: const CircleBorder(),
+                  padding: const EdgeInsets.all(14),
+                  backgroundColor: _controller.text.trim().isNotEmpty
+                      ? Colors.blue
                       : Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(25),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(25),
-                    onTap: _controller.text.trim().isNotEmpty && !_isBotTyping
-                        ? () => _sendMessage(_controller.text)
-                        : null,
-                    child: Container(
-                      width: 50,
-                      height: 50,
-                      child: Icon(
-                        Icons.send_rounded,
-                        color: _controller.text.trim().isNotEmpty
-                            ? Colors.white
-                            : Colors.grey.shade500,
-                        size: 20,
-                      ),
-                    ),
-                  ),
+                ),
+                child: Icon(
+                  Icons.send,
+                  color: _controller.text.trim().isNotEmpty
+                      ? Colors.white
+                      : Colors.grey.shade500,
                 ),
               ),
             ],
@@ -391,120 +662,69 @@ class _AiChatScreenState extends State<AiChatScreen>
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.grey.shade800,
-        title: Row(
+        title: const Row(
           children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue.shade400, Colors.blue.shade600],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.smart_toy_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'AI Assistant',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  'Online',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.green.shade600,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
-            ),
+            Icon(Icons.medical_services, color: Colors.blue),
+            SizedBox(width: 8),
+            Text("AI Medical Assistant"),
           ],
         ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
         actions: [
-          IconButton(
-            icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
-            onPressed: () {
-              // Add menu functionality here
-            },
-          ),
+          if (_messages.length > 1)
+            IconButton(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Clear Chat'),
+                    content: const Text('Are you sure you want to clear the conversation?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _messages.clear();
+                            isStartPhase = true;
+                            isSymptomPhase = false;
+                            selectedSymptoms.clear();
+                          });
+                          _addWelcomeMessage();
+                          Navigator.pop(context);
+                        },
+                        child: const Text('Clear'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Start Over',
+            ),
         ],
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
       ),
       body: Column(
         children: [
+          if (isSymptomPhase) _buildSymptomSelector(),
           Expanded(
-            child: _messages.isEmpty && !_isBotTyping
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Colors.blue.shade400, Colors.blue.shade600],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            color: Colors.white,
-                            size: 36,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Start a conversation',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Ask me anything and I\'ll do my best to help!',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.only(top: 16, bottom: 20),
-                    itemCount: _messages.length + (_isBotTyping ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (_isBotTyping && index == _messages.length) {
-                        return _buildTypingIndicator();
-                      }
-                      return _buildMessage(_messages[index], index);
-                    },
-                  ),
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.only(top: 16, bottom: 20),
+              itemCount: _messages.length + (_isBotTyping ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (_isBotTyping && index == _messages.length) {
+                  return _buildTypingIndicator();
+                }
+                return _buildMessage(_messages[index], index);
+              },
+            ),
           ),
-          _buildInputArea(),
+          if (!isSymptomPhase) _buildInputArea(),
         ],
       ),
     );

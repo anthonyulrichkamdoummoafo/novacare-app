@@ -584,7 +584,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: const Icon(
-                              Icons.favorite,
+                              Icons.medical_services,
                               color: Colors.white,
                               size: 32,
                             ),
