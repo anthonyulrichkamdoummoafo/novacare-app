@@ -99,3 +99,10 @@ ValueError: y should be a 1d array, got an array of shape (1, 41) instead.
 2025-06-25 19:19:51,330:INFO:Top predictions: [{'disease': 'Paralysis (brain hemorrhage)', 'confidence': 0.32}, {'disease': 'Hypoglycemia', 'confidence': 0.14}, {'disease': 'Migraine', 'confidence': 0.1}] | Urgency: Low
 2025-06-25 19:20:32,921:INFO:Top predictions: [{'disease': 'Paralysis (brain hemorrhage)', 'confidence': 0.36}, {'disease': 'Migraine', 'confidence': 0.12}, {'disease': '(vertigo) Paroymsal  Positional Vertigo', 'confidence': 0.1}] | Urgency: Low
 2025-06-25 19:26:46,167:INFO:API is shutting down
+2025-06-26 01:35:31,406:INFO:API started and ready to receive requests
+2025-06-26 05:19:00,488:INFO:API is shutting down
+2025-06-26 09:15:45,092:INFO:API started and ready to receive requests
+2025-06-26 09:18:02,890:INFO:Top predictions: [{'disease': 'AIDS', 'confidence': 0.24}, {'disease': 'Bronchial Asthma', 'confidence': 0.22}, {'disease': 'Impetigo', 'confidence': 0.14}] | Urgency: Low
+2025-06-26 10:52:32,955:INFO:Top predictions: [{'disease': 'GERD', 'confidence': 0.3}, {'disease': 'Arthritis', 'confidence': 0.1}, {'disease': 'Dimorphic hemmorhoids(piles)', 'confidence': 0.08}] | Urgency: Low
+2025-06-26 10:52:46,066:INFO:Top predictions: [{'disease': 'Urinary tract infection', 'confidence': 0.42}, {'disease': 'Drug Reaction', 'confidence': 0.22}, {'disease': 'Arthritis', 'confidence': 0.1}] | Urgency: Medium
+2025-06-26 13:39:47,399:INFO:API is shutting down

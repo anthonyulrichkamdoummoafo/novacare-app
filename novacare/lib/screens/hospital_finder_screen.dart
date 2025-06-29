@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:geolocator/geolocator.dart';
 
 class HospitalFinderScreen extends StatefulWidget {
   const HospitalFinderScreen({super.key});
@@ -9,68 +13,164 @@ class HospitalFinderScreen extends StatefulWidget {
   State<HospitalFinderScreen> createState() => _HospitalFinderScreenState();
 }
 
+class HospitalService {
+  static const baseUrl = 'http://192.168.233.1:8000';
+
+  static Future<List<dynamic>> fetchHospitals(double lat, double lon,
+      {String? type}) async {
+    final uri =
+        Uri.parse('$baseUrl/recommend-hospitals').replace(queryParameters: {
+      'lat': lat.toString(),
+      'lon': lon.toString(),
+      if (type != null) 'type': type,
+    });
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to load hospitals');
+    }
+  }
+}
+
 class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
   String _selectedFilter = 'All';
   bool _isMapView = false;
-
-  final List<Map<String, dynamic>> hospitals = const [
-    {
-      'name': 'City General Hospital',
-      'specialty': 'Emergency Medicine',
-      'distance': 1.2,
-      'rating': 4.5,
-      'reviews': 324,
-      'address': '123 Main Street, Downtown',
-      'phone': '+1 (555) 123-4567',
-      'waitTime': '15-20 min',
-      'status': 'Open',
-      'isEmergency': true,
-      'acceptsInsurance': true,
-      'image': 'assets/hospital1.jpg', // placeholder
-    },
-    {
-      'name': 'St. Mary\'s Medical Center',
-      'specialty': 'Internal Medicine',
-      'distance': 2.8,
-      'rating': 4.8,
-      'reviews': 156,
-      'address': '456 Oak Avenue, Midtown',
-      'phone': '+1 (555) 234-5678',
-      'waitTime': '30-45 min',
-      'status': 'Open',
-      'isEmergency': false,
-      'acceptsInsurance': true,
-      'image': 'assets/hospital2.jpg', // placeholder
-    },
-    {
-      'name': 'University Health Clinic',
-      'specialty': 'General Practice',
-      'distance': 3.5,
-      'rating': 4.2,
-      'reviews': 89,
-      'address': '789 University Blvd, Campus',
-      'phone': '+1 (555) 345-6789',
-      'waitTime': '60+ min',
-      'status': 'Closed',
-      'isEmergency': false,
-      'acceptsInsurance': false,
-      'image': 'assets/hospital3.jpg', // placeholder
-    },
-  ];
+  bool _isLoading = false;
+  List<Map<String, dynamic>> _allHospitals = [];
+  List<Map<String, dynamic>> _filteredHospitals = [];
+  StreamSubscription<Position>? _positionStream;
 
   List<String> get filterOptions => ['All', 'Emergency', 'Open Now', 'Nearby'];
 
-  List<Map<String, dynamic>> get filteredHospitals {
-    switch (_selectedFilter) {
-      case 'Emergency':
-        return hospitals.where((h) => h['isEmergency'] == true).toList();
-      case 'Open Now':
-        return hospitals.where((h) => h['status'] == 'Open').toList();
-      case 'Nearby':
-        return hospitals.where((h) => h['distance'] <= 2.0).toList();
-      default:
-        return hospitals;
+  @override
+  void initState() {
+    super.initState();
+    _loadHospitals();
+    _startLocationUpdates();
+  }
+
+  @override
+  void dispose() {
+    _positionStream?.cancel();
+    super.dispose();
+  }
+
+  Future<Position?> _determinePosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Check if location services are enabled
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _showErrorSnackBar('Location services are disabled.');
+      return null;
     }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        _showErrorSnackBar('Location permissions are denied');
+        return null;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      _showErrorSnackBar(
+          'Location permissions are permanently denied, please enable them in settings.');
+      return null;
+    }
+
+    // Get current position
+    return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
+  }
+
+  Future<void> _loadHospitals() async {
+    setState(() => _isLoading = true);
+    try {
+      final position = await _determinePosition();
+      if (position == null) {
+        setState(() => _isLoading = false);
+        return; // permission or service disabled, stop here
+      }
+
+      final hospitals = await HospitalService.fetchHospitals(
+        position.latitude,
+        position.longitude,
+      );
+
+      setState(() {
+        _allHospitals = List<Map<String, dynamic>>.from(hospitals);
+        _applyFilter(position); // pass position to filter
+      });
+    } catch (e) {
+      print('Error fetching hospitals: $e');
+      _showErrorSnackBar('Failed to fetch hospitals: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _startLocationUpdates() async {
+    final permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) return;
+
+    _positionStream = Geolocator.getPositionStream(
+      locationSettings: LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 50, // update every 50 meters
+      ),
+    ).listen((Position position) {
+      // Reapply filter with new position
+      _applyFilter(position);
+    });
+  }
+
+  void _applyFilter([Position? userPosition]) {
+    setState(() {
+      switch (_selectedFilter) {
+        case 'Emergency':
+          _filteredHospitals = _allHospitals
+              .where((h) => (h['facility_type'] ?? '')
+                  .toString()
+                  .toLowerCase()
+                  .contains('emergency'))
+              .toList();
+          break;
+        case 'Nearby':
+          if (userPosition == null) {
+            _filteredHospitals = _allHospitals;
+            break;
+          }
+
+          _filteredHospitals = _allHospitals.where((hospital) {
+            final lat = hospital['latitude'];
+            final lon = hospital['longitude'];
+            if (lat == null || lon == null) return false;
+
+            final distanceInMeters = Geolocator.distanceBetween(
+              userPosition.latitude,
+              userPosition.longitude,
+              lat,
+              lon,
+            );
+            final distanceInKm = distanceInMeters / 1000;
+            return distanceInKm <= 2.0;
+          }).toList();
+          break;
+        case 'Open Now':
+          _filteredHospitals = _allHospitals
+              .where((h) =>
+                  (h['status']?.toString().toLowerCase() ?? '') == 'open')
+              .toList();
+          break;
+        default:
+          _filteredHospitals = _allHospitals;
+      }
+    });
   }
 
   Future<void> _makePhoneCall(String phoneNumber) async {
@@ -114,7 +214,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
             color: Colors.white,
           ),
         ),
-        backgroundColor: const Color(0xFF0891B2), // Modern teal
+        backgroundColor: Colors.teal,
         elevation: 0,
         actions: [
           IconButton(
@@ -141,105 +241,113 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Filter Section
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0x0F000000),
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
               children: [
-                const Text(
-                  'Filter Results',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF374151),
+                // Filter Section
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x0F000000),
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: filterOptions.map((filter) {
-                      final isSelected = _selectedFilter == filter;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          label: Text(
-                            filter,
-                            style: TextStyle(
-                              color: isSelected ? Colors.white : const Color(0xFF6B7280),
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                            ),
-                          ),
-                          selected: isSelected,
-                          onSelected: (selected) {
-                            setState(() {
-                              _selectedFilter = filter;
-                            });
-                          },
-                          backgroundColor: const Color(0xFFF3F4F6),
-                          selectedColor: const Color(0xFF0891B2),
-                          checkmarkColor: Colors.white,
-                          elevation: 0,
-                          pressElevation: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Filter Results',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF374151),
                         ),
-                      );
-                    }).toList(),
+                      ),
+                      const SizedBox(height: 12),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: filterOptions.map((filter) {
+                            final isSelected = _selectedFilter == filter;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: FilterChip(
+                                label: Text(
+                                  filter,
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : const Color(0xFF6B7280),
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                                selected: isSelected,
+                                onSelected: (selected) {
+                                  setState(() {
+                                    _selectedFilter = filter;
+                                    _applyFilter();
+                                  });
+                                },
+                                backgroundColor: const Color(0xFFF3F4F6),
+                                selectedColor: Colors.teal,
+                                checkmarkColor: Colors.white,
+                                elevation: 0,
+                                pressElevation: 2,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Results Header
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  color: const Color(0xFFF8FAFB),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${_filteredHospitals.length} hospital${_filteredHospitals.length != 1 ? 's' : ''}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const Text(
+                        'Sorted by distance',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Hospital List
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredHospitals.length,
+                    itemBuilder: (context, index) {
+                      final hospital = _filteredHospitals[index];
+                      return _buildHospitalCard(hospital);
+                    },
                   ),
                 ),
               ],
             ),
-          ),
-          // Results Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: const Color(0xFFF8FAFB),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${filteredHospitals.length} hospital${filteredHospitals.length != 1 ? 's' : ''} found',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF6B7280),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  'Sorted by distance',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF6B7280),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Hospital List
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: filteredHospitals.length,
-              itemBuilder: (context, index) {
-                final hospital = filteredHospitals[index];
-                return _buildHospitalCard(hospital);
-              },
-            ),
-          ),
-        ],
-      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           _makePhoneCall('112'); // Emergency number
@@ -258,9 +366,9 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
   }
 
   Widget _buildHospitalCard(Map<String, dynamic> hospital) {
-    final isOpen = hospital['status'] == 'Open';
+    final isOpen = (hospital['status']?.toString().toLowerCase() ?? '') == 'open';
     final hasEmergency = hospital['isEmergency'] == true;
-    
+
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 16),
@@ -286,7 +394,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0891B2).withOpacity(0.1),
+                      color: Colors.teal.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -305,7 +413,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                           children: [
                             Expanded(
                               child: Text(
-                                hospital['name']!,
+                                hospital['facility_name'] ?? 'Unknown Hospital',
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w600,
@@ -313,12 +421,12 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                                 ),
                               ),
                             ),
-                            _buildStatusChip(hospital['status']),
+                            _buildStatusChip(hospital['status'] ?? 'Closed'),
                           ],
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          hospital['specialty']!,
+                          hospital['facility_type'] ?? 'General',
                           style: const TextStyle(
                             fontSize: 14,
                             color: Color(0xFF6B7280),
@@ -329,16 +437,24 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                         // Rating and Reviews
                         Row(
                           children: [
-                            ...List.generate(5, (i) => Icon(
-                              Icons.star,
-                              size: 16,
-                              color: i < hospital['rating'].floor()
-                                  ? Colors.amber[600]
-                                  : Colors.grey[300],
-                            )),
+                            ...List.generate(
+                              5,
+                              (i) {
+                                final rating = hospital['rating'];
+                                final safeRating =
+                                    (rating is num) ? rating.floor() : 0;
+                                return Icon(
+                                  Icons.star,
+                                  size: 16,
+                                  color: i < safeRating
+                                      ? Colors.amber[600]
+                                      : Colors.grey[300],
+                                );
+                              },
+                            ),
                             const SizedBox(width: 8),
                             Text(
-                              '${hospital['rating']} (${hospital['reviews']} reviews)',
+                              '${hospital['rating'] ?? '0'} (${hospital['reviews'] ?? 0} reviews)',
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: Color(0xFF6B7280),
@@ -358,14 +474,14 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                   Expanded(
                     child: _buildInfoItem(
                       Icons.place_outlined,
-                      '${hospital['distance']} km away',
+                      '${hospital['distance_km'] ?? '?'} km away',
                       const Color(0xFF059669),
                     ),
                   ),
                   Expanded(
                     child: _buildInfoItem(
                       Icons.access_time,
-                      hospital['waitTime'],
+                      hospital['waitTime'] ?? 'N/A',
                       const Color(0xFFD97706),
                     ),
                   ),
@@ -375,7 +491,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
               // Address
               _buildInfoItem(
                 Icons.location_on_outlined,
-                hospital['address'],
+                hospital['address'] ?? 'Address not available',
                 const Color(0xFF6B7280),
               ),
               const SizedBox(height: 16),
@@ -385,11 +501,13 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                   Expanded(
                     flex: 2,
                     child: ElevatedButton.icon(
-                      onPressed: isOpen ? () => _bookAppointment(hospital) : null,
+                      onPressed:
+                          isOpen ? () => _bookAppointment(hospital) : null,
                       icon: const Icon(Icons.calendar_today, size: 18),
                       label: Text(isOpen ? 'Book Now' : 'Closed'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isOpen ? const Color(0xFF0891B2) : Colors.grey[400],
+                        backgroundColor:
+                            isOpen ? Colors.teal : Colors.grey[400],
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
@@ -402,11 +520,18 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => _makePhoneCall(hospital['phone']!),
+                      onPressed: () {
+                        final phone = hospital['phone'];
+                        if (phone != null && phone.isNotEmpty) {
+                          _makePhoneCall(phone);
+                        } else {
+                          _showErrorSnackBar('Phone number not available');
+                        }
+                      },
                       icon: const Icon(Icons.phone, size: 18),
                       label: const Text('Call'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF0891B2),
+                        foregroundColor: Colors.teal,
                         side: const BorderSide(color: Color(0xFF0891B2)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
@@ -421,7 +546,8 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
               if (hasEmergency) ...[
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.red[50],
                     borderRadius: BorderRadius.circular(20),
@@ -452,7 +578,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
   }
 
   Widget _buildStatusChip(String status) {
-    final isOpen = status == 'Open';
+    final isOpen = status.toLowerCase() == 'open';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -524,9 +650,9 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          Text(
+          const Text(
             'Book Appointment',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w600,
               color: Color(0xFF111827),
@@ -534,7 +660,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            hospital['name'],
+            hospital['facility_name'] ?? 'Unknown Hospital',
             style: const TextStyle(
               fontSize: 16,
               color: Color(0xFF6B7280),
@@ -576,11 +702,16 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.pop(context);
-                    _makePhoneCall(hospital['phone']);
+                    final phone = hospital['phone'];
+                    if (phone != null && phone.isNotEmpty) {
+                      _makePhoneCall(phone);
+                    } else {
+                      _showErrorSnackBar('Phone number not available');
+                    }
                   },
                   child: const Text('Call Now'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0891B2),
+                    backgroundColor: Colors.teal,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -598,6 +729,6 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
   }
 
   void _showHospitalDetails(Map<String, dynamic> hospital) {
-    _showSuccessSnackBar('Detailed view for ${hospital['name']} coming soon!');
+    _showSuccessSnackBar('Detailed view for ${hospital['facility_name']} coming soon!');
   }
 }

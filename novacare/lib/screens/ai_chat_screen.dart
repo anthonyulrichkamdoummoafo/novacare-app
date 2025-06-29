@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+// import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 
 class AiChatScreen extends StatefulWidget {
   static const routeName = '/ai_chat';
@@ -21,8 +23,10 @@ class _AiChatScreenState extends State<AiChatScreen>
   bool _isBotTyping = false;
   late AnimationController _typingAnimationController;
 
-  final String apiUrl = 'http://172.16.5.48:8000/webhook';
-  final String symptomsUrl = 'http://172.16.5.48:8000/symptoms';
+  final String apiUrl = 'http://192.168.233.1:8000/webhook';
+  final String symptomsUrl = 'http://192.168.233.1:8000/symptoms';
+
+
 
   // State management
   bool isStartPhase = true;
@@ -264,7 +268,7 @@ class _AiChatScreenState extends State<AiChatScreen>
                   icon: const Icon(Icons.refresh),
                   label: const Text('Try Again'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
+                    backgroundColor: Colors.teal,
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -276,7 +280,7 @@ class _AiChatScreenState extends State<AiChatScreen>
               icon: const Icon(Icons.medical_services),
               label: const Text('Start Symptom Check'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
+                backgroundColor: Colors.teal,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
@@ -309,7 +313,7 @@ class _AiChatScreenState extends State<AiChatScreen>
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                const Icon(Icons.checklist, color: Colors.blue),
+                const Icon(Icons.checklist, color: Colors.teal),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
@@ -338,13 +342,13 @@ class _AiChatScreenState extends State<AiChatScreen>
                     label: Text(symptom),
                     selected: selected,
                     onSelected: (_) => _toggleSymptom(symptom),
-                    selectedColor: Colors.blue.shade100,
-                    checkmarkColor: Colors.blue.shade700,
+                    selectedColor: Colors.teal.shade100,
+                    checkmarkColor: Colors.teal.shade700,
                     backgroundColor: Colors.grey.shade100,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                       side: BorderSide(
-                        color: selected ? Colors.blue.shade300 : Colors.transparent,
+                        color: selected ? Colors.teal.shade300 : Colors.transparent,
                       ),
                     ),
                   );
@@ -409,7 +413,7 @@ class _AiChatScreenState extends State<AiChatScreen>
                               : 'Continue (${selectedSymptoms.length})'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: selectedSymptoms.isNotEmpty 
-                                ? Colors.green 
+                                ? Colors.teal
                                 : Colors.grey.shade300,
                             foregroundColor: selectedSymptoms.isNotEmpty 
                                 ? Colors.white 
@@ -454,7 +458,7 @@ class _AiChatScreenState extends State<AiChatScreen>
                 height: 8,
                 width: 8,
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(
+                  color: Colors.teal.withOpacity(
                     ((_typingAnimationController.value + (index * 0.3)) % 1.0) > 0.5
                         ? 0.8
                         : 0.3,
@@ -484,16 +488,16 @@ class _AiChatScreenState extends State<AiChatScreen>
         margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.blue.shade50,
+          color: Colors.teal.shade50,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.blue.shade100),
+          border: Border.all(color: Colors.teal.shade100),
         ),
         child: Column(
           children: [
             Text(
               msg['text'],
               style: TextStyle(
-                color: Colors.blue.shade800,
+                color: Colors.teal.shade800,
                 fontSize: 15,
                 height: 1.4,
               ),
@@ -527,7 +531,7 @@ class _AiChatScreenState extends State<AiChatScreen>
             decoration: BoxDecoration(
               gradient: isUser
                   ? LinearGradient(
-                      colors: [Colors.blue.shade600, Colors.blue.shade700],
+                      colors: [Colors.teal.shade600, Colors.teal.shade700],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     )
@@ -640,7 +644,7 @@ class _AiChatScreenState extends State<AiChatScreen>
                   shape: const CircleBorder(),
                   padding: const EdgeInsets.all(14),
                   backgroundColor: _controller.text.trim().isNotEmpty
-                      ? Colors.blue
+                      ? Colors.teal
                       : Colors.grey.shade300,
                 ),
                 child: Icon(
@@ -662,12 +666,13 @@ class _AiChatScreenState extends State<AiChatScreen>
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.medical_services, color: Colors.blue),
-            SizedBox(width: 8),
-            Text("AI Medical Assistant"),
-          ],
+        title: const Text(
+          "AI Medical Assistant",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            color: Colors.black87,
+          ),
         ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,

@@ -5,7 +5,7 @@ import '/screens/ai_chat_screen.dart';
 import '/screens/medical_records/medical_records_screen.dart';
 import '/screens/settings/settings_screens.dart';
 import '/screens/hospital_finder_screen.dart';
-
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 class HomeContent extends StatelessWidget {
   final void Function(int) onTabChange;
@@ -355,6 +355,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _selectedIndex = 0;
   late AnimationController _animationController;
 
+  String _userName = 'User'; // Default name
+
   static const List<String> _appBarTitles = [
     'Home',
     'AI Chat',
@@ -365,11 +367,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _loadUserName();
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
     _animationController.forward();
+  }
+
+  Future<void> _loadUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userName = prefs.getString('user_name') ?? 'User';
+    });
   }
 
   @override
@@ -452,10 +462,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   String _getUserInitials() {
-    // You can replace this with actual user data from Supabase
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user?.email != null) {
-      return user!.email!.substring(0, 2).toUpperCase();
+    final parts = _userName.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase(); // John Doe → JD
+    } else if (parts.isNotEmpty) {
+      return parts[0][0].toUpperCase(); // Juste → J
     }
     return 'U';
   }
