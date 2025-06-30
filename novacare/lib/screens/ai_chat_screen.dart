@@ -23,8 +23,8 @@ class _AiChatScreenState extends State<AiChatScreen>
   bool _isBotTyping = false;
   late AnimationController _typingAnimationController;
 
-  final String apiUrl = 'http://192.168.233.1:8000/webhook';
-  final String symptomsUrl = 'http://192.168.233.1:8000/symptoms';
+  final String apiUrl = 'http://172.16.5.210:8000/webhook';
+  final String symptomsUrl = 'http://172.16.5.210:8000/symptoms';
 
 
 

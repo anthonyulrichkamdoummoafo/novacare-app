@@ -27,14 +27,12 @@ async def predict_disease(input: SymptomInput):
     if not input.symptoms:
         return JSONResponse(status_code=400, content={"error": "Symptom list cannot be empty."})
     try:
-        top_predictions, urgency_level = model_inference(input.symptoms)
-        return {
-            "top_predictions": top_predictions,
-            "urgency_level": urgency_level
-        }
+        predictions = model_inference(input.symptoms)
+        return {"predictions": predictions}
     except Exception as e:
         logging.error(f"Prediction error: {e}\n{traceback.format_exc()}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
 
 @app.post("/webhook")
 async def webhook(request: Request):
@@ -44,24 +42,27 @@ async def webhook(request: Request):
         matched_symptoms = extract_symptoms_from_text(user_query)
 
         if not matched_symptoms:
-            return JSONResponse({
-                "fulfillmentText": "Sorry, I couldn't detect any known symptoms. Please describe your symptoms clearly."
-            })
+            return JSONResponse({"fulfillmentText": "Error: No known symptoms detected in your query."})
 
-        top_predictions, urgency_level = model_inference(matched_symptoms)
-        best = top_predictions[0]
-        response_text = (
-            f"🦠 Possible Disease: {best['disease']} (Confidence: {best['confidence']})\n"
-            f"⚠️ Urgency Level: {urgency_level}"
-        )
-        return JSONResponse({"fulfillmentText": response_text})
+        predictions = model_inference(matched_symptoms)
+
+        # Build human-friendly message
+        response_lines = ["🤖 Based on your symptoms, here are possible conditions:"]
+        for i, pred in enumerate(predictions, 1):
+            line = f"{i}. 🦠 {pred['disease']} — Urgency: {pred['urgency']} (Confidence: {pred['confidence']}%)"
+            response_lines.append(line)
+
+        return JSONResponse({"fulfillmentText": "\n".join(response_lines)})
     except Exception as e:
         logging.error(f"Webhook error: {e}\n{traceback.format_exc()}")
         return JSONResponse({"fulfillmentText": f"Error: {str(e)}"})
 
+
 @app.get("/symptoms")
 async def get_symptoms():
     try:
+        if columns is None:
+            raise ValueError("Symptoms list is not available")
         return JSONResponse(content=columns)
     except Exception as e:
         logging.error(f"Symptoms route error: {e}\n{traceback.format_exc()}")

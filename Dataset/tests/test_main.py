@@ -1,71 +1,77 @@
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+import pytest
 from fastapi.testclient import TestClient
 from main import app
-from model_utils import model_inference, extract_symptoms_from_text
 
 client = TestClient(app)
 
-def test_webhook_with_sentence():
-    payload = {
+def test_predict_disease_success():
+    """Test successful disease prediction with multiple results"""
+    test_data = {"symptoms": ["fever", "headache", "fatigue"]}
+    response = client.post("/predict", json=test_data)
+    assert response.status_code == 200
+    body = response.json()
+    assert "predictions" in body
+    assert isinstance(body["predictions"], list)
+    assert len(body["predictions"]) > 1
+    for pred in body["predictions"]:
+        assert "disease" in pred
+        assert "confidence" in pred
+        assert "urgency" in pred
+
+def test_predict_disease_empty_symptoms():
+    """Test prediction with empty symptoms list"""
+    response = client.post("/predict", json={"symptoms": []})
+    assert response.status_code == 400
+    assert response.json()["error"] == "Symptom list cannot be empty."
+
+def test_predict_disease_invalid_input():
+    """Test prediction with invalid input format"""
+    response = client.post("/predict", json={"wrong_key": ["fever"]})
+    assert response.status_code == 422
+
+def test_webhook_success():
+    """Test webhook with user-friendly multiple prediction format"""
+    test_data = {
         "queryResult": {
-            "queryText": "I have my stomach pains"
+            "queryText": "I have cough and headache and fatigue"
         }
     }
-    response = client.post("/webhook", json=payload)
+    response = client.post("/webhook", json=test_data)
     assert response.status_code == 200
-    data = response.json()
-    assert "fulfillmentText" in data
-    print("Webhook response:", data["fulfillmentText"])
-
-def test_predict_valid_symptoms():
-    payload = {
-        "symptoms": ["headache", "nausea"]
-    }
-    response = client.post("/predict", json=payload)
-    assert response.status_code == 200
-    data = response.json()
-    assert "predicted_disease" in data
-    assert "urgency_level" in data
-
-def test_predict_invalid_input():
-    payload = {
-        "symptoms": "not a list"  # invalid type for symptoms
-    }
-    response = client.post("/predict", json=payload)
-    assert response.status_code == 422  # Validation error from Pydantic
-
-def test_predict_empty_symptoms_list():
-    payload = {
-        "symptoms": []
-    }
-    response = client.post("/predict", json=payload)
-    assert response.status_code == 400
-    data = response.json()
-    assert "error" in data
-    assert data["error"] == "Symptom list cannot be empty."
+    msg = response.json()["fulfillmentText"]
+    assert "🤖 Based on your symptoms" in msg
+    assert "🦠" in msg
+    assert "Urgency:" in msg
+    assert "%" in msg
 
 def test_webhook_no_symptoms():
-    payload = {
+    """Test webhook with query that has no known symptoms"""
+    test_data = {
         "queryResult": {
-            "queryText": "I feel great with no symptoms"
+            "queryText": "I feel like spaghetti"
         }
     }
-    response = client.post("/webhook", json=payload)
+    response = client.post("/webhook", json=test_data)
     assert response.status_code == 200
-    data = response.json()
-    assert "fulfillmentText" in data
-    assert "couldn't detect any known symptoms" in data["fulfillmentText"]
+    assert "No known symptoms detected" in response.json()["fulfillmentText"]
 
-def test_model_inference_and_extraction():
-    symptoms = ["headache", "fatigue"]
-    predicted_disease, predicted_urgency = model_inference(symptoms)
-    assert isinstance(predicted_disease, str)
-    assert isinstance(predicted_urgency, str)
+def test_webhook_malformed_request():
+    """Test webhook with malformed request"""
+    response = client.post("/webhook", json={"wrong_structure": "value"})
+    assert response.status_code == 200
+    assert "Error:" in response.json()["fulfillmentText"]
 
-    text = "I have a headache and some fatigue"
-    extracted = extract_symptoms_from_text(text)
-    assert "headache" in extracted
-    assert "fatigue" in extracted
+def test_get_symptoms_success():
+    """Test retrieval of symptom vocabulary"""
+    response = client.get("/symptoms")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+    assert len(response.json()) > 0
+
+def test_get_symptoms_error_handling(monkeypatch):
+    """Force error in /symptoms by patching"""
+    from main import columns
+    monkeypatch.setattr('main.columns', None)
+    response = client.get("/symptoms")
+    assert response.status_code == 500
+    assert "error" in response.json()

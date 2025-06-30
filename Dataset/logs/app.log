@@ -106,3 +106,6 @@ ValueError: y should be a 1d array, got an array of shape (1, 41) instead.
 2025-06-26 10:52:32,955:INFO:Top predictions: [{'disease': 'GERD', 'confidence': 0.3}, {'disease': 'Arthritis', 'confidence': 0.1}, {'disease': 'Dimorphic hemmorhoids(piles)', 'confidence': 0.08}] | Urgency: Low
 2025-06-26 10:52:46,066:INFO:Top predictions: [{'disease': 'Urinary tract infection', 'confidence': 0.42}, {'disease': 'Drug Reaction', 'confidence': 0.22}, {'disease': 'Arthritis', 'confidence': 0.1}] | Urgency: Medium
 2025-06-26 13:39:47,399:INFO:API is shutting down
+2025-06-30 10:05:56,891:INFO:API started and ready to receive requests
+2025-06-30 10:13:47,598:INFO:Predicted: [{'disease': 'Hypertension ', 'confidence': 18.0, 'urgency': 'Medium'}, {'disease': 'Heart attack', 'confidence': 18.0, 'urgency': 'Medium'}, {'disease': 'Osteoarthristis', 'confidence': 14.0, 'urgency': 'Medium'}]
+2025-06-30 11:10:53,496:INFO:Predicted: [{'disease': 'Hepatitis C', 'confidence': 24.0, 'urgency': 'Medium'}, {'disease': 'Peptic ulcer diseae', 'confidence': 14.0, 'urgency': 'Medium'}, {'disease': 'Chronic cholestasis', 'confidence': 8.0, 'urgency': 'Medium'}]
