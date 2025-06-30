@@ -109,3 +109,21 @@ ValueError: y should be a 1d array, got an array of shape (1, 41) instead.
 2025-06-30 10:05:56,891:INFO:API started and ready to receive requests
 2025-06-30 10:13:47,598:INFO:Predicted: [{'disease': 'Hypertension ', 'confidence': 18.0, 'urgency': 'Medium'}, {'disease': 'Heart attack', 'confidence': 18.0, 'urgency': 'Medium'}, {'disease': 'Osteoarthristis', 'confidence': 14.0, 'urgency': 'Medium'}]
 2025-06-30 11:10:53,496:INFO:Predicted: [{'disease': 'Hepatitis C', 'confidence': 24.0, 'urgency': 'Medium'}, {'disease': 'Peptic ulcer diseae', 'confidence': 14.0, 'urgency': 'Medium'}, {'disease': 'Chronic cholestasis', 'confidence': 8.0, 'urgency': 'Medium'}]
+2025-06-30 18:46:11,319:INFO:Predicted: [{'disease': 'Bronchial Asthma', 'confidence': 20.0, 'urgency': 'Medium'}, {'disease': 'Hepatitis C', 'confidence': 20.0, 'urgency': 'Medium'}, {'disease': 'Arthritis', 'confidence': 10.0, 'urgency': 'Medium'}]
+2025-06-30 18:46:59,059:INFO:Predicted: [{'disease': 'Paralysis (brain hemorrhage)', 'confidence': 36.0, 'urgency': 'Low'}, {'disease': 'Migraine', 'confidence': 12.0, 'urgency': 'Low'}, {'disease': '(vertigo) Paroymsal  Positional Vertigo', 'confidence': 10.0, 'urgency': 'Low'}]
+2025-06-30 20:19:48,827:INFO:Predicted: [{'disease': 'AIDS', 'confidence': 38.0, 'urgency': 'Low'}, {'disease': 'Impetigo', 'confidence': 20.0, 'urgency': 'Low'}, {'disease': 'Dimorphic hemmorhoids(piles)', 'confidence': 6.0, 'urgency': 'Low'}]
+2025-06-30 20:43:24,963:INFO:Predicted: [{'disease': 'Arthritis', 'confidence': 12.0, 'urgency': 'Low'}, {'disease': 'Diabetes ', 'confidence': 12.0, 'urgency': 'Low'}, {'disease': 'Dimorphic hemmorhoids(piles)', 'confidence': 10.0, 'urgency': 'Low'}]
+2025-06-30 20:48:37,906:INFO:API is shutting down
+2025-06-30 21:12:07,857:INFO:Loading ML models...
+2025-06-30 21:12:15,909:INFO:Successfully loaded models with 132 features
+2025-06-30 21:12:15,918:WARNING:OpenAI library not available. Install with: pip install openai
+2025-06-30 21:12:15,919:WARNING:Transformers library not available. Install with: pip install transformers torch
+2025-06-30 21:12:15,922:INFO:Initialized Simple LLM (fallback)
+2025-06-30 21:12:15,985:INFO:NovaCare Medical AI API started and ready to receive requests
+2025-06-30 21:12:15,985:INFO:LLM Service initialized: SimpleLLM
+2025-06-30 21:14:46,178:INFO:Webhook request: hi...
+2025-06-30 21:14:46,182:INFO:Extracted symptoms: Pattern=0, LLM=0, Valid=0
+2025-06-30 21:20:44,643:INFO:Webhook request: hi...
+2025-06-30 21:20:44,643:INFO:Extracted symptoms: Pattern=0, LLM=0, Valid=0
+2025-06-30 21:21:16,555:INFO:API is shutting down
+2025-06-30 21:21:23,783:INFO:API started and ready to receive requests

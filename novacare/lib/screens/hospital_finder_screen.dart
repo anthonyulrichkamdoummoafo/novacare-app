@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
+import '../services/supabase_service.dart';
 
 class HospitalFinderScreen extends StatefulWidget {
   const HospitalFinderScreen({super.key});
@@ -34,6 +35,7 @@ class HospitalService {
 }
 
 class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
+  final SupabaseService _supabaseService = SupabaseService();
   String _selectedFilter = 'All';
   bool _isMapView = false;
   bool _isLoading = false;
@@ -105,6 +107,17 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
         _allHospitals = List<Map<String, dynamic>>.from(hospitals);
         _applyFilter(position); // pass position to filter
       });
+
+      // Log the activity
+      try {
+        await _supabaseService.logActivity(
+          'hospital_search',
+          'Searched for hospitals near current location (${hospitals.length} found)',
+        );
+      } catch (e) {
+        // Silently handle logging errors
+        debugPrint('Error logging activity: $e');
+      }
     } catch (e) {
       print('Error fetching hospitals: $e');
       _showErrorSnackBar('Failed to fetch hospitals: $e');
@@ -366,7 +379,8 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
   }
 
   Widget _buildHospitalCard(Map<String, dynamic> hospital) {
-    final isOpen = (hospital['status']?.toString().toLowerCase() ?? '') == 'open';
+    final isOpen =
+        (hospital['status']?.toString().toLowerCase() ?? '') == 'open';
     final hasEmergency = hospital['isEmergency'] == true;
 
     return Card(
@@ -729,6 +743,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
   }
 
   void _showHospitalDetails(Map<String, dynamic> hospital) {
-    _showSuccessSnackBar('Detailed view for ${hospital['facility_name']} coming soon!');
+    _showSuccessSnackBar(
+        'Detailed view for ${hospital['facility_name']} coming soon!');
   }
 }

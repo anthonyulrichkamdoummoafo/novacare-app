@@ -7,7 +7,10 @@ import '/screens/settings/settings_screens.dart';
 import '/screens/hospital_finder_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
-class HomeContent extends StatelessWidget {
+import '../models/recent_activity.dart';
+import '../services/supabase_service.dart';
+
+class HomeContent extends StatefulWidget {
   final void Function(int) onTabChange;
   final bool isLoading;
 
@@ -18,9 +21,44 @@ class HomeContent extends StatelessWidget {
   });
 
   @override
+  State<HomeContent> createState() => _HomeContentState();
+}
+
+class _HomeContentState extends State<HomeContent> {
+  final SupabaseService _supabaseService = SupabaseService();
+  List<RecentActivity> _recentActivities = [];
+  bool _isLoadingActivities = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecentActivities();
+  }
+
+  Future<void> _loadRecentActivities() async {
+    setState(() {
+      _isLoadingActivities = true;
+    });
+
+    try {
+      final activities = await _supabaseService.fetchRecentActivities();
+      setState(() {
+        _recentActivities = activities;
+      });
+    } catch (e) {
+      // Handle error silently for now
+      print('Error loading recent activities: $e');
+    } finally {
+      setState(() {
+        _isLoadingActivities = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: isLoading
+      child: widget.isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.teal))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20.0),
@@ -30,15 +68,15 @@ class HomeContent extends StatelessWidget {
                   // Welcome Header
                   _buildWelcomeHeader(),
                   const SizedBox(height: 32),
-                  
+
                   // Quick Actions Grid
                   _buildQuickActionsGrid(context),
                   const SizedBox(height: 32),
-                  
+
                   // Recent Activity Section
                   _buildRecentActivitySection(),
                   const SizedBox(height: 24),
-                  
+
                   // Health Tips Card
                   _buildHealthTipsCard(),
                 ],
@@ -152,16 +190,16 @@ class HomeContent extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         ...actions.map((action) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _buildActionCard(
-            context,
-            title: action['title'] as String,
-            subtitle: action['subtitle'] as String,
-            icon: action['icon'] as IconData,
-            color: action['color'] as Color,
-            onTap: () => onTabChange(action['index'] as int),
-          ),
-        )),
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildActionCard(
+                context,
+                title: action['title'] as String,
+                subtitle: action['subtitle'] as String,
+                icon: action['icon'] as IconData,
+                color: action['color'] as Color,
+                onTap: () => widget.onTabChange(action['index'] as int),
+              ),
+            )),
       ],
     );
   }
@@ -247,52 +285,226 @@ class HomeContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Recent Activity',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Recent Activity',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            if (_isLoadingActivities)
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.teal,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            children: [
-              Icon(
-                Icons.history_rounded,
-                color: Colors.grey.shade400,
-                size: 48,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'No recent activity',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Your recent health interactions will appear here',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
+        _isLoadingActivities
+            ? _buildLoadingActivityCard()
+            : _recentActivities.isEmpty
+                ? _buildEmptyActivityCard()
+                : _buildActivityList(),
       ],
     );
+  }
+
+  Widget _buildLoadingActivityCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        children: [
+          const CircularProgressIndicator(
+            color: Colors.teal,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Loading recent activities...',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyActivityCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.history_rounded,
+            color: Colors.grey.shade400,
+            size: 48,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No recent activity',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Your recent health interactions will appear here',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityList() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: _recentActivities.asMap().entries.map((entry) {
+          final index = entry.key;
+          final activity = entry.value;
+          final isLast = index == _recentActivities.length - 1;
+
+          return _buildActivityItem(activity, isLast);
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildActivityItem(RecentActivity activity, bool isLast) {
+    IconData icon;
+    Color iconColor;
+
+    switch (activity.type.toLowerCase()) {
+      case 'chat':
+      case 'ai_chat':
+        icon = Icons.chat_bubble_rounded;
+        iconColor = const Color(0xFF00ACC1);
+        break;
+      case 'medical_record':
+      case 'record':
+        icon = Icons.folder_rounded;
+        iconColor = const Color(0xFF26A69A);
+        break;
+      case 'hospital':
+      case 'hospital_search':
+        icon = Icons.local_hospital_rounded;
+        iconColor = const Color(0xFF66BB6A);
+        break;
+      case 'symptom':
+      case 'symptoms':
+        icon = Icons.healing_rounded;
+        iconColor = const Color(0xFFFF7043);
+        break;
+      default:
+        icon = Icons.circle_rounded;
+        iconColor = Colors.grey.shade600;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: isLast
+            ? null
+            : Border(
+                bottom: BorderSide(color: Colors.grey.shade100),
+              ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: iconColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  activity.description,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatTimestamp(activity.timestamp),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimestamp(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
+    }
   }
 
   Widget _buildHealthTipsCard() {

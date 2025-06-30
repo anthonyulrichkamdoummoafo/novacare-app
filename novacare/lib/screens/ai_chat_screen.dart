@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/supabase_service.dart';
+import '../models/chat_conversation.dart';
+import 'chat_history_screen.dart';
 // import 'package:flutter_dotenv/flutter_dotenv.dart';
-
 
 class AiChatScreen extends StatefulWidget {
   static const routeName = '/ai_chat';
@@ -20,13 +22,17 @@ class _AiChatScreenState extends State<AiChatScreen>
   final ScrollController _scrollController = ScrollController();
   final List<Map<String, dynamic>> _messages = [];
   final FocusNode _textFieldFocus = FocusNode();
+  final SupabaseService _supabaseService = SupabaseService();
   bool _isBotTyping = false;
   late AnimationController _typingAnimationController;
 
   final String apiUrl = 'http://172.16.5.210:8000/webhook';
   final String symptomsUrl = 'http://172.16.5.210:8000/symptoms';
 
-
+  // Chat saving state
+  String? _currentConversationId;
+  bool _isChatSaved = false;
+  bool _isSavingChat = false;
 
   // State management
   bool isStartPhase = true;
@@ -45,7 +51,7 @@ class _AiChatScreenState extends State<AiChatScreen>
     )..repeat();
 
     _addWelcomeMessage();
-    
+
     // Listen for text changes to enable/disable send button
     _controller.addListener(() {
       setState(() {});
@@ -65,7 +71,8 @@ class _AiChatScreenState extends State<AiChatScreen>
     setState(() {
       _messages.add({
         'role': 'bot',
-        'text': 'Hello! I\'m your AI medical assistant. I\'ll help you understand your symptoms and provide preliminary guidance. Please note that this is not a substitute for professional medical advice.',
+        'text':
+            'Hello! I\'m your AI medical assistant. I\'ll help you understand your symptoms and provide preliminary guidance. Please note that this is not a substitute for professional medical advice.',
         'timestamp': DateTime.now(),
         'type': 'start',
       });
@@ -95,15 +102,17 @@ class _AiChatScreenState extends State<AiChatScreen>
           isSymptomPhase = true;
           isLoading = false;
         });
-        
+
         // Add a bot message to guide the user
-        _addBotMessage('Please select all symptoms you\'re experiencing from the list below. You can select multiple symptoms.');
+        _addBotMessage(
+            'Please select all symptoms you\'re experiencing from the list below. You can select multiple symptoms.');
       } else {
         throw Exception('Server returned ${response.statusCode}');
       }
     } catch (e) {
       setState(() {
-        errorMessage = 'Unable to load symptoms. Please check your connection and try again.';
+        errorMessage =
+            'Unable to load symptoms. Please check your connection and try again.';
         isLoading = false;
       });
       debugPrint("Error fetching symptoms: $e");
@@ -140,7 +149,7 @@ class _AiChatScreenState extends State<AiChatScreen>
 
     final message = 'My symptoms are: ${selectedSymptoms.join(', ')}';
     _sendMessage(message);
-    
+
     setState(() {
       selectedSymptoms.clear();
       isSymptomPhase = false;
@@ -151,27 +160,31 @@ class _AiChatScreenState extends State<AiChatScreen>
     setState(() {
       isSymptomPhase = false;
     });
-    _addBotMessage('No problem! You can describe your symptoms in your own words. How can I help you today?');
+    _addBotMessage(
+        'No problem! You can describe your symptoms in your own words. How can I help you today?');
   }
 
   Future<String> sendToBackend(String userMessage) async {
     try {
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: <String, String>{
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode({
-          'queryResult': {
-            'queryText': userMessage,
-          }
-        }),
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .post(
+            Uri.parse(apiUrl),
+            headers: <String, String>{
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({
+              'queryResult': {
+                'queryText': userMessage,
+              }
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['fulfillmentText'] ?? 'I apologize, but I couldn\'t process your request properly. Could you please rephrase your question?';
+        return data['fulfillmentText'] ??
+            'I apologize, but I couldn\'t process your request properly. Could you please rephrase your question?';
       } else {
         return 'I\'m experiencing some technical difficulties. Please try again in a moment.';
       }
@@ -200,10 +213,22 @@ class _AiChatScreenState extends State<AiChatScreen>
     _controller.clear();
     _scrollToBottom();
 
+    // Log the activity
+    try {
+      await _supabaseService.logActivity(
+        'ai_chat',
+        'Asked: "${message.trim().length > 50 ? '${message.trim().substring(0, 50)}...' : message.trim()}"',
+      );
+    } catch (e) {
+      // Silently handle logging errors
+      debugPrint('Error logging activity: $e');
+    }
+
     try {
       String botResponse = await sendToBackend(message);
 
-      await Future.delayed(const Duration(milliseconds: 500)); // Simulate thinking time
+      await Future.delayed(
+          const Duration(milliseconds: 500)); // Simulate thinking time
 
       setState(() {
         _messages.add({
@@ -217,7 +242,8 @@ class _AiChatScreenState extends State<AiChatScreen>
       setState(() {
         _messages.add({
           'role': 'bot',
-          'text': 'I apologize for the inconvenience. There was an error processing your request. Please try again.',
+          'text':
+              'I apologize for the inconvenience. There was an error processing your request. Please try again.',
           'timestamp': DateTime.now(),
         });
         _isBotTyping = false;
@@ -225,6 +251,153 @@ class _AiChatScreenState extends State<AiChatScreen>
     }
 
     _scrollToBottom();
+  }
+
+  // Chat saving methods
+  Future<void> _saveChatConversation() async {
+    if (_messages.isEmpty) return;
+
+    setState(() {
+      _isSavingChat = true;
+    });
+
+    try {
+      // Filter out welcome/start messages for saving
+      final messagesToSave =
+          _messages.where((msg) => msg['type'] != 'start').toList();
+
+      if (messagesToSave.isNotEmpty) {
+        await _supabaseService.saveChatConversation(
+          messagesToSave,
+          conversationId: _currentConversationId,
+        );
+
+        setState(() {
+          _isChatSaved = true;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Chat conversation saved successfully!'),
+              backgroundColor: Colors.teal,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save chat: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      debugPrint('Error saving chat: $e');
+    } finally {
+      setState(() {
+        _isSavingChat = false;
+      });
+    }
+  }
+
+  Future<void> _showSaveChatDialog() async {
+    final shouldSave = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.save_rounded, color: Colors.teal),
+            SizedBox(width: 12),
+            Text('Save Chat'),
+          ],
+        ),
+        content: const Text(
+          'Would you like to save this conversation? You can access it later from your chat history.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.teal,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Save Chat'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldSave == true) {
+      await _saveChatConversation();
+    }
+  }
+
+  void _clearChat() {
+    setState(() {
+      _messages.clear();
+      _currentConversationId = null;
+      _isChatSaved = false;
+      isStartPhase = true;
+      isSymptomPhase = false;
+      selectedSymptoms.clear();
+    });
+    _addWelcomeMessage();
+  }
+
+  Future<void> _showClearChatDialog() async {
+    final shouldClear = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.refresh_rounded, color: Colors.orange),
+            SizedBox(width: 12),
+            Text('Clear Chat'),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to clear this conversation? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Clear Chat'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldClear == true) {
+      _clearChat();
+    }
   }
 
   void _scrollToBottom() {
@@ -282,7 +455,8 @@ class _AiChatScreenState extends State<AiChatScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.teal,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),
         ],
@@ -328,7 +502,7 @@ class _AiChatScreenState extends State<AiChatScreen>
               ],
             ),
           ),
-          
+
           // Scrollable symptoms area
           Expanded(
             child: SingleChildScrollView(
@@ -348,7 +522,9 @@ class _AiChatScreenState extends State<AiChatScreen>
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                       side: BorderSide(
-                        color: selected ? Colors.teal.shade300 : Colors.transparent,
+                        color: selected
+                            ? Colors.teal.shade300
+                            : Colors.transparent,
                       ),
                     ),
                   );
@@ -356,7 +532,7 @@ class _AiChatScreenState extends State<AiChatScreen>
               ),
             ),
           ),
-          
+
           // Footer - Fixed at bottom
           Container(
             padding: const EdgeInsets.all(16),
@@ -406,17 +582,19 @@ class _AiChatScreenState extends State<AiChatScreen>
                           left: selectedSymptoms.isNotEmpty ? 8 : 0,
                         ),
                         child: ElevatedButton.icon(
-                          onPressed: selectedSymptoms.isNotEmpty ? _sendSymptoms : null,
+                          onPressed: selectedSymptoms.isNotEmpty
+                              ? _sendSymptoms
+                              : null,
                           icon: const Icon(Icons.send, size: 18),
-                          label: Text(selectedSymptoms.isEmpty 
-                              ? 'Select symptoms' 
+                          label: Text(selectedSymptoms.isEmpty
+                              ? 'Select symptoms'
                               : 'Continue (${selectedSymptoms.length})'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: selectedSymptoms.isNotEmpty 
+                            backgroundColor: selectedSymptoms.isNotEmpty
                                 ? Colors.teal
                                 : Colors.grey.shade300,
-                            foregroundColor: selectedSymptoms.isNotEmpty 
-                                ? Colors.white 
+                            foregroundColor: selectedSymptoms.isNotEmpty
+                                ? Colors.white
                                 : Colors.grey.shade500,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
@@ -459,7 +637,8 @@ class _AiChatScreenState extends State<AiChatScreen>
                 width: 8,
                 decoration: BoxDecoration(
                   color: Colors.teal.withOpacity(
-                    ((_typingAnimationController.value + (index * 0.3)) % 1.0) > 0.5
+                    ((_typingAnimationController.value + (index * 0.3)) % 1.0) >
+                            0.5
                         ? 0.8
                         : 0.3,
                   ),
@@ -678,38 +857,89 @@ class _AiChatScreenState extends State<AiChatScreen>
         foregroundColor: Colors.black,
         elevation: 0,
         actions: [
-          if (_messages.length > 1)
+          // Save chat button
+          if (_messages.length > 1 && !_isChatSaved)
             IconButton(
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Clear Chat'),
-                    content: const Text('Are you sure you want to clear the conversation?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel'),
+              onPressed: _isSavingChat ? null : _showSaveChatDialog,
+              icon: _isSavingChat
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.teal,
                       ),
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _messages.clear();
-                            isStartPhase = true;
-                            isSymptomPhase = false;
-                            selectedSymptoms.clear();
-                          });
-                          _addWelcomeMessage();
-                          Navigator.pop(context);
-                        },
-                        child: const Text('Clear'),
-                      ),
+                    )
+                  : const Icon(Icons.save_rounded),
+              tooltip: 'Save Chat',
+            ),
+
+          // Chat saved indicator
+          if (_isChatSaved)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.0),
+              child: Icon(
+                Icons.check_circle_rounded,
+                color: Colors.green,
+                size: 20,
+              ),
+            ),
+
+          // Clear chat button
+          if (_messages.length > 1)
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'clear') {
+                  _showClearChatDialog();
+                } else if (value == 'save') {
+                  _showSaveChatDialog();
+                } else if (value == 'history') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ChatHistoryScreen(),
+                    ),
+                  );
+                }
+              },
+              itemBuilder: (BuildContext context) => [
+                const PopupMenuItem<String>(
+                  value: 'history',
+                  child: Row(
+                    children: [
+                      Icon(Icons.history_rounded, size: 20),
+                      SizedBox(width: 12),
+                      Text('Chat History'),
                     ],
                   ),
-                );
-              },
-              icon: const Icon(Icons.refresh),
-              tooltip: 'Start Over',
+                ),
+                if (!_isChatSaved)
+                  const PopupMenuItem<String>(
+                    value: 'save',
+                    child: Row(
+                      children: [
+                        Icon(Icons.save_rounded, size: 20),
+                        SizedBox(width: 12),
+                        Text('Save Chat'),
+                      ],
+                    ),
+                  ),
+                const PopupMenuItem<String>(
+                  value: 'clear',
+                  child: Row(
+                    children: [
+                      Icon(Icons.refresh_rounded, size: 20),
+                      SizedBox(width: 12),
+                      Text('Clear Chat'),
+                    ],
+                  ),
+                ),
+              ],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              icon: const Icon(Icons.more_vert_rounded),
+              tooltip: 'Chat Options',
             ),
         ],
       ),

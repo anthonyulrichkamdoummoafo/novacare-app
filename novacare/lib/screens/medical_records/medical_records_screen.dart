@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/supabase_service.dart';
 
 class MedicalRecordsScreen extends StatefulWidget {
   const MedicalRecordsScreen({super.key});
@@ -13,6 +14,7 @@ class MedicalRecordsScreen extends StatefulWidget {
 class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
     with SingleTickerProviderStateMixin {
   final supabase = Supabase.instance.client;
+  final SupabaseService _supabaseService = SupabaseService();
   List<Map<String, dynamic>> records = [];
   bool loading = true;
   bool isSubmitting = false;
@@ -36,7 +38,7 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-    
+
     fetchRecords();
     _symptomsController = TextEditingController();
     _conditionsController = TextEditingController();
@@ -88,36 +90,39 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
 
   Future<bool> _showDeleteConfirmation() async {
     return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
-            SizedBox(width: 12),
-            Text('Confirm Deletion'),
-          ],
-        ),
-        content: const Text(
-          'Are you sure you want to delete this medical record? This action cannot be undone.',
-          style: TextStyle(fontSize: 16),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+          context: context,
+          builder: (context) => AlertDialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: Colors.orange, size: 28),
+                SizedBox(width: 12),
+                Text('Confirm Deletion'),
+              ],
             ),
-            child: const Text('Delete'),
+            content: const Text(
+              'Are you sure you want to delete this medical record? This action cannot be undone.',
+              style: TextStyle(fontSize: 16),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Delete'),
+              ),
+            ],
           ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   Future<void> submitRecord() async {
@@ -154,18 +159,38 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
             .update(data)
             .eq('id', editingRecordId)
             .select(); // Add select() to get response data for debugging
-        
+
         print('Update response: $response');
         _showSuccessSnackBar('Record updated successfully');
+
+        // Log the activity for update
+        try {
+          await _supabaseService.logActivity(
+            'medical_record',
+            'Updated medical record',
+          );
+        } catch (e) {
+          debugPrint('Error logging activity: $e');
+        }
       } else {
         print('Inserting new record');
         final response = await supabase
             .from('medical_records')
             .insert(data)
             .select(); // Add select() to get response data for debugging
-        
+
         print('Insert response: $response');
         _showSuccessSnackBar('Record added successfully');
+
+        // Log the activity for new record
+        try {
+          await _supabaseService.logActivity(
+            'medical_record',
+            'Added new medical record',
+          );
+        } catch (e) {
+          debugPrint('Error logging activity: $e');
+        }
       }
 
       if (!mounted) return;
@@ -175,9 +200,9 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
       // Enhanced error logging
       print('Error saving record: $e');
       print('Error type: ${e.runtimeType}');
-      
+
       String errorMessage = 'Failed to save record. ';
-      
+
       // Handle specific error types
       if (e is PostgrestException) {
         errorMessage += 'Database error: ${e.message}';
@@ -191,7 +216,7 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
       } else {
         errorMessage += e.toString();
       }
-      
+
       _showErrorSnackBar(errorMessage);
     } finally {
       if (mounted) setState(() => isSubmitting = false);
@@ -230,7 +255,8 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 6), // Longer duration for error messages
+        duration:
+            const Duration(seconds: 6), // Longer duration for error messages
       ),
     );
   }
@@ -286,7 +312,9 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
                     const SizedBox(width: 16),
                     Expanded(
                       child: Text(
-                        editingRecordId != null ? 'Edit Medical Record' : 'Add New Medical Record',
+                        editingRecordId != null
+                            ? 'Edit Medical Record'
+                            : 'Add New Medical Record',
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -345,14 +373,17 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: isSubmitting ? null : () => Navigator.of(context).pop(),
+                        onPressed: isSubmitting
+                            ? null
+                            : () => Navigator.of(context).pop(),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('Cancel', style: TextStyle(fontSize: 16)),
+                        child: const Text('Cancel',
+                            style: TextStyle(fontSize: 16)),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -374,10 +405,12 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
                                 ),
                               )
-                            : const Text('Save Record', style: TextStyle(fontSize: 16)),
+                            : const Text('Save Record',
+                                style: TextStyle(fontSize: 16)),
                       ),
                     ),
                   ],
@@ -443,7 +476,8 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Colors.red),
             ),
-            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             filled: true,
             fillColor: Colors.grey.shade50,
           ),
@@ -476,7 +510,11 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
       );
     }
 
-    final items = data.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    final items = data
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -526,7 +564,8 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
         child: Card(
           elevation: 4,
           shadowColor: Colors.black.withOpacity(0.1),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           margin: const EdgeInsets.only(bottom: 16),
           child: Container(
             decoration: BoxDecoration(
@@ -554,7 +593,8 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
                           color: Colors.teal.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.medical_information, color: Colors.teal, size: 20),
+                        child: const Icon(Icons.medical_information,
+                            color: Colors.teal, size: 20),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -580,8 +620,10 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
                         ),
                       ),
                       PopupMenuButton<String>(
-                        icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        icon:
+                            Icon(Icons.more_vert, color: Colors.grey.shade600),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                         onSelected: (value) {
                           if (value == 'edit') {
                             showRecordForm(record: record);
@@ -615,7 +657,7 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
                     ],
                   ),
                   const SizedBox(height: 20),
-                  
+
                   // Symptoms Section
                   const Text(
                     'Symptoms',
@@ -626,9 +668,10 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildChipList(record['symptoms'], Colors.red, Icons.local_hospital),
+                  _buildChipList(
+                      record['symptoms'], Colors.red, Icons.local_hospital),
                   const SizedBox(height: 16),
-                  
+
                   // Conditions Section
                   const Text(
                     'Conditions',
@@ -639,9 +682,10 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildChipList(record['conditions'], Colors.orange, Icons.medical_services),
+                  _buildChipList(record['conditions'], Colors.orange,
+                      Icons.medical_services),
                   const SizedBox(height: 16),
-                  
+
                   // Medications Section
                   const Text(
                     'Medications',
@@ -652,7 +696,8 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildChipList(record['medications'], Colors.blue, Icons.medication),
+                  _buildChipList(
+                      record['medications'], Colors.blue, Icons.medication),
                 ],
               ),
             ),
@@ -753,7 +798,7 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
                     ),
                   ),
                 ),
-                
+
                 // Content
                 Expanded(
                   child: records.isEmpty
@@ -798,7 +843,8 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen>
                       : ListView.builder(
                           padding: const EdgeInsets.all(20),
                           itemCount: records.length,
-                          itemBuilder: (context, index) => _buildRecordCard(records[index], index),
+                          itemBuilder: (context, index) =>
+                              _buildRecordCard(records[index], index),
                         ),
                 ),
               ],
