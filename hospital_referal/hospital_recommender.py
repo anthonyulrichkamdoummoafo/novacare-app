@@ -18,6 +18,10 @@ def recommend_hospitals(patient_coords, top_n=5, required_type=None):
     if required_type:
         data = data[data["facility_type"].str.contains(required_type, case=False, na=False)]
 
+    # Return empty DataFrame if no matches found
+    if data.empty:
+        return data[["facility_name", "facility_type", "latitude", "longitude"]].assign(distance_km=[])
+
     data["distance_km"] = data.apply(
         lambda row: geodesic(patient_coords, (row["latitude"], row["longitude"])).km,
         axis=1

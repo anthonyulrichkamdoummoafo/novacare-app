@@ -4,12 +4,12 @@ import numpy as np
 import pandas as pd
 
 # Load the trained model and encoders
-model = joblib.load("disease_urgency_model.pkl")
-disease_encoder = joblib.load("disease_encoder.pkl")
-urgency_encoder = joblib.load("urgency_encoder.pkl")
+model = joblib.load("models/disease_urgency_model.pkl")
+disease_encoder = joblib.load("models/disease_encoder.pkl")
+urgency_encoder = joblib.load("models/urgency_encoder.pkl")
 
 # Load symptoms list (columns) for proper input
-columns = pd.read_csv("Training_with_Urgency.csv").drop(['Disease', 'Urgency_Level'], axis=1).columns.tolist()
+columns = pd.read_csv("models/Training_with_Urgency.csv").drop(['Disease', 'Urgency_Level'], axis=1).columns.tolist()
 
 # 🧠 Example: User reports these symptoms
 input_symptoms = ['headache', 'nausea', 'fatigue']

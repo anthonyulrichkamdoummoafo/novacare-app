@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../services/supabase_service.dart';
-import '../models/chat_conversation.dart';
+// import '../models/chat_conversation.dart';
 import 'chat_history_screen.dart';
 // import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -26,8 +26,8 @@ class _AiChatScreenState extends State<AiChatScreen>
   bool _isBotTyping = false;
   late AnimationController _typingAnimationController;
 
-  final String apiUrl = 'http://172.16.5.210:8000/webhook';
-  final String symptomsUrl = 'http://172.16.5.210:8000/symptoms';
+  final String apiUrl = 'http://172.20.10.7:8000/webhook';
+  final String symptomsUrl = 'http://172.20.10.7:8000/symptoms';
 
   // Chat saving state
   String? _currentConversationId;

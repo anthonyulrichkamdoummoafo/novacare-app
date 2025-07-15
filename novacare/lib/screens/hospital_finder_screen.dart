@@ -15,7 +15,7 @@ class HospitalFinderScreen extends StatefulWidget {
 }
 
 class HospitalService {
-  static const baseUrl = 'http://172.16.5.210:8100';
+  static const baseUrl = 'http://172.20.10.7:8001';
 
   static Future<List<dynamic>> fetchHospitals(double lat, double lon,
       {String? type}) async {
