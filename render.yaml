@@ -6,11 +6,12 @@ services:
     startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
     plan: free
     rootDir: ./Dataset
+    pythonVersion: "3.11.0"
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
       - key: LOG_LEVEL
         value: INFO
+      - key: PYTHONUNBUFFERED
+        value: "1"
 
   - type: web
     name: novacare-hospital-api
@@ -19,8 +20,9 @@ services:
     startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
     plan: free
     rootDir: ./hospital_referal
+    pythonVersion: "3.11.0"
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
       - key: LOG_LEVEL
         value: INFO
+      - key: PYTHONUNBUFFERED
+        value: "1"

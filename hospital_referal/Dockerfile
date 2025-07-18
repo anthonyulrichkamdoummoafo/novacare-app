@@ -27,12 +27,12 @@ RUN mkdir -p logs
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Expose port
-EXPOSE 8001
+# Use PORT environment variable from Render
+ENV PORT=8001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8001/health || exit 1
+    CMD curl -f http://localhost:$PORT/health || exit 1
 
-# Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "2"]
+# Run the application with dynamic port
+CMD uvicorn main:app --host 0.0.0.0 --port $PORT
