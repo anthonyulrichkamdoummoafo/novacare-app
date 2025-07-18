@@ -13,7 +13,8 @@ void main() async {
 
   await Supabase.initialize(
     url: 'https://hkttoorbmvmyqawugyef.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrdHRvb3JibXZteXFhd3VneWVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0Mzg4NjQsImV4cCI6MjA2MzAxNDg2NH0.QVy951TUaHyEgjH1fCIt7XdDqj-Scga_1TpA0Yrns34',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrdHRvb3JibXZteXFhd3VneWVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0Mzg4NjQsImV4cCI6MjA2MzAxNDg2NH0.QVy951TUaHyEgjH1fCIt7XdDqj-Scga_1TpA0Yrns34',
   );
 
   runApp(const MyApp());
@@ -25,7 +26,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: false, // Removes debug banner
       title: 'NovaCare',
       theme: ThemeData.light().copyWith(
         scaffoldBackgroundColor: Colors.white,
@@ -44,7 +45,8 @@ class MyApp extends StatelessWidget {
         LoginScreen.routeName: (context) => const LoginScreen(),
         SettingsScreen.routeName: (context) => const SettingsScreen(),
         AiChatScreen.routeName: (context) => const AiChatScreen(),
-        MedicalRecordsScreen.routeName: (context) => const MedicalRecordsScreen(),
+        MedicalRecordsScreen.routeName: (context) =>
+            const MedicalRecordsScreen(),
       },
     );
   }

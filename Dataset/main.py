@@ -1,37 +1,125 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from typing import List
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field, validator
+from typing import List, Optional, Dict, Any
 import logging
 import traceback
 from contextlib import asynccontextmanager
+from datetime import datetime
+import time
+from functools import lru_cache
 
 from model_utils import model_inference, extract_symptoms_from_text, columns
 
-logging.basicConfig(filename='logs/app.log', level=logging.INFO,
-                    format='%(asctime)s:%(levelname)s:%(message)s')
+# Enhanced logging configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('logs/app.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+class SymptomInput(BaseModel):
+    symptoms: List[str] = Field(..., min_items=1, max_items=20, description="List of symptoms")
+
+    @validator('symptoms')
+    def validate_symptoms(cls, v):
+        if not v:
+            raise ValueError('Symptoms list cannot be empty')
+        # Clean and validate symptoms
+        cleaned = [s.strip().lower() for s in v if s.strip()]
+        if not cleaned:
+            raise ValueError('No valid symptoms provided')
+        return cleaned
+
+class PredictionResponse(BaseModel):
+    predictions: List[Dict[str, Any]]
+    timestamp: datetime
+    processing_time_ms: float
+    symptoms_used: List[str]
+
+class WebhookRequest(BaseModel):
+    queryResult: Dict[str, Any]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logging.info("API started and ready to receive requests")
+    logger.info("Disease Prediction API started and ready to receive requests")
     yield
-    logging.info("API is shutting down")
+    logger.info("Disease Prediction API is shutting down")
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="Disease Prediction API",
+    description="AI-powered disease prediction based on symptoms",
+    version="2.0.0",
+    lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure for production
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 class SymptomInput(BaseModel):
     symptoms: List[str]
 
-@app.post("/predict")
+@lru_cache(maxsize=1000)
+def cached_model_inference(symptoms_tuple):
+    """Cached version of model inference for better performance"""
+    return model_inference(list(symptoms_tuple))
+
+@app.post("/predict", response_model=PredictionResponse)
 async def predict_disease(input: SymptomInput):
-    if not input.symptoms:
-        return JSONResponse(status_code=400, content={"error": "Symptom list cannot be empty."})
+    """
+    Predict diseases based on symptoms.
+
+    - **symptoms**: List of symptoms (1-20 items)
+
+    Returns predictions with confidence scores and urgency levels.
+    """
+    start_time = time.time()
+
     try:
-        predictions = model_inference(input.symptoms)
-        return {"predictions": predictions}
+        logger.info(f"Prediction request with symptoms: {input.symptoms}")
+
+        # Validate symptoms against known symptoms
+        valid_symptoms = [s for s in input.symptoms if s in columns]
+        if not valid_symptoms:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No valid symptoms found. Please check symptom names."
+            )
+
+        # Use cached inference for better performance
+        symptoms_tuple = tuple(sorted(valid_symptoms))
+        predictions = cached_model_inference(symptoms_tuple)
+
+        processing_time = (time.time() - start_time) * 1000
+
+        response = PredictionResponse(
+            predictions=predictions,
+            timestamp=datetime.now(),
+            processing_time_ms=round(processing_time, 2),
+            symptoms_used=valid_symptoms
+        )
+
+        logger.info(f"Prediction completed in {processing_time:.2f}ms")
+        return response
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logging.error(f"Prediction error: {e}\n{traceback.format_exc()}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        logger.error(f"Prediction error: {e}\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Prediction failed: {str(e)}"
+        )
 
 
 @app.post("/webhook")

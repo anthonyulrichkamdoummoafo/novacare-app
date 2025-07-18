@@ -144,3 +144,16 @@ ValueError: y should be a 1d array, got an array of shape (1, 41) instead.
 2025-07-15 06:51:34,991:INFO:Predicted: [{'disease': 'Allergy', 'confidence': 70.0, 'urgency': 'Low'}, {'disease': 'AIDS', 'confidence': 22.0, 'urgency': 'Low'}, {'disease': 'Hypertension ', 'confidence': 1.0, 'urgency': 'Low'}]
 2025-07-15 06:57:43,355:INFO:Predicted: [{'disease': 'Cervical spondylosis', 'confidence': 45.0, 'urgency': 'Low'}, {'disease': 'Osteoarthristis', 'confidence': 22.0, 'urgency': 'Low'}, {'disease': 'Acne', 'confidence': 7.0, 'urgency': 'Low'}]
 2025-07-15 06:58:27,977:INFO:Predicted: [{'disease': 'Paralysis (brain hemorrhage)', 'confidence': 32.0, 'urgency': 'Low'}, {'disease': 'Hypertension ', 'confidence': 12.0, 'urgency': 'Low'}, {'disease': 'Migraine', 'confidence': 8.0, 'urgency': 'Low'}]
+2025-07-15 07:06:43,981:INFO:Predicted: [{'disease': 'Allergy', 'confidence': 41.0, 'urgency': 'Low'}, {'disease': 'Dimorphic hemmorhoids(piles)', 'confidence': 11.0, 'urgency': 'Low'}, {'disease': 'Urinary tract infection', 'confidence': 8.0, 'urgency': 'Low'}]
+2025-07-15 07:07:04,361:INFO:Predicted: [{'disease': 'Paralysis (brain hemorrhage)', 'confidence': 32.0, 'urgency': 'Low'}, {'disease': 'Hypertension ', 'confidence': 12.0, 'urgency': 'Low'}, {'disease': 'Migraine', 'confidence': 8.0, 'urgency': 'Low'}]
+2025-07-15 07:11:29,711:INFO:Predicted: [{'disease': 'Allergy', 'confidence': 63.0, 'urgency': 'Low'}, {'disease': 'Cervical spondylosis', 'confidence': 5.0, 'urgency': 'Low'}, {'disease': 'Dimorphic hemmorhoids(piles)', 'confidence': 5.0, 'urgency': 'Low'}]
+2025-07-15 17:51:29,470:INFO:API is shutting down
+2025-07-15 17:51:36,997:INFO:Disease Prediction API started and ready to receive requests
+2025-07-15 17:51:49,535:INFO:Disease Prediction API is shutting down
+2025-07-15 17:51:52,740:INFO:Disease Prediction API started and ready to receive requests
+2025-07-15 18:35:35,726:INFO:Disease Prediction API is shutting down
+2025-07-17 00:44:47,690:INFO:Disease Prediction API started and ready to receive requests
+2025-07-17 00:45:40,937:INFO:Predicted: [{'disease': 'GERD', 'confidence': 30.0, 'urgency': 'Low'}, {'disease': 'Dimorphic hemmorhoids(piles)', 'confidence': 10.0, 'urgency': 'Low'}, {'disease': 'Acne', 'confidence': 6.0, 'urgency': 'Low'}]
+2025-07-18 02:15:35,287:INFO:Disease Prediction API is shutting down
+2025-07-18 02:19:44,332:INFO:Disease Prediction API started and ready to receive requests
+2025-07-18 02:23:34,216:INFO:Disease Prediction API is shutting down

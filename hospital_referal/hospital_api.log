@@ -1,0 +1,27 @@
+2025-07-15 17:50:25,241 - main - INFO - Hospital Referral API started
+2025-07-15 17:50:25,495 - main - INFO - Hospital Referral API shutting down
+2025-07-15 17:50:27,539 - main - INFO - Hospital Referral API started
+2025-07-15 17:50:51,619 - main - INFO - Hospital Referral API shutting down
+2025-07-15 17:50:53,805 - main - INFO - Hospital Referral API started
+2025-07-17 00:46:43,264 - main - INFO - Hospital Referral API started
+2025-07-17 00:47:33,430 - main - INFO - Hospital search request: lat=4.0206389, lon=9.2035777, type=None, top_n=10
+2025-07-17 00:47:33,431 - hospital_recommender - INFO - Starting with 3019 hospitals
+2025-07-17 00:47:34,164 - hospital_recommender - INFO - Returning 10 hospitals
+2025-07-17 00:47:34,192 - main - INFO - Returning 10 hospitals
+2025-07-17 18:28:35,246 - main - INFO - Hospital search request: lat=4.0206389, lon=9.2035777, type=None, top_n=10
+2025-07-17 18:28:35,525 - hospital_recommender - INFO - Starting with 3019 hospitals
+2025-07-17 18:28:37,798 - hospital_recommender - INFO - Returning 10 hospitals
+2025-07-17 18:28:37,812 - main - INFO - Returning 10 hospitals
+2025-07-17 18:30:52,555 - main - INFO - Hospital search request: lat=4.0206389, lon=9.2035777, type=None, top_n=10
+2025-07-17 18:30:52,557 - hospital_recommender - INFO - Starting with 3019 hospitals
+2025-07-17 18:30:53,438 - hospital_recommender - INFO - Returning 10 hospitals
+2025-07-17 18:30:53,439 - main - INFO - Returning 10 hospitals
+2025-07-18 02:15:43,532 - main - INFO - Hospital Referral API shutting down
+2025-07-18 02:19:49,638 - main - INFO - Hospital Referral API started
+2025-07-18 02:23:45,443 - main - INFO - Hospital Referral API shutting down
+2025-07-18 02:52:19,675 - main - INFO - Hospital Referral API started
+2025-07-18 02:52:27,302 - main - INFO - Hospital search request: lat=4.0187798, lon=9.1727745, type=None, top_n=10
+2025-07-18 02:52:27,305 - hospital_recommender - INFO - Starting with 3019 hospitals
+2025-07-18 02:52:28,089 - hospital_recommender - INFO - Returning 10 hospitals
+2025-07-18 02:52:28,091 - main - INFO - Returning 10 hospitals
+2025-07-18 02:52:45,745 - main - INFO - Hospital Referral API shutting down

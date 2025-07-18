@@ -15,22 +15,87 @@ class HospitalFinderScreen extends StatefulWidget {
 }
 
 class HospitalService {
-  static const baseUrl = 'http://172.20.10.7:8001';
+  static const baseUrl = 'http://192.168.39.111:8001';
+  static const Duration timeoutDuration = Duration(seconds: 10);
 
   static Future<List<dynamic>> fetchHospitals(double lat, double lon,
-      {String? type}) async {
-    final uri =
-        Uri.parse('$baseUrl/recommend-hospitals').replace(queryParameters: {
-      'lat': lat.toString(),
-      'lon': lon.toString(),
-      if (type != null) 'type': type,
-    });
-    final response = await http.get(uri);
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Failed to load hospitals');
+      {String? type, int topN = 10}) async {
+    try {
+      final uri =
+          Uri.parse('$baseUrl/recommend-hospitals').replace(queryParameters: {
+        'lat': lat.toString(),
+        'lon': lon.toString(),
+        'top_n': topN.toString(),
+        if (type != null && type.isNotEmpty) 'type': type,
+      });
+
+      final response = await http.get(uri).timeout(timeoutDuration);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> hospitals = jsonDecode(response.body);
+        return hospitals
+            .map((hospital) => _enhanceHospitalData(hospital))
+            .toList();
+      } else if (response.statusCode == 404) {
+        return []; // No hospitals found
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } on TimeoutException {
+      throw Exception('Request timeout. Please check your connection.');
+    } catch (e) {
+      throw Exception('Failed to load hospitals: $e');
     }
+  }
+
+  static Map<String, dynamic> _enhanceHospitalData(
+      Map<String, dynamic> hospital) {
+    // Add mock data for features not in the API
+    return {
+      ...hospital,
+      'status': _generateStatus(),
+      'rating': _generateRating(),
+      'reviews': _generateReviews(),
+      'waitTime': _generateWaitTime(),
+      'isEmergency': _isEmergencyFacility(hospital['facility_type'] ?? ''),
+      'phone': _generatePhoneNumber(),
+      'services': _generateServices(hospital['facility_type'] ?? ''),
+    };
+  }
+
+  static String _generateStatus() {
+    return ['Open', 'Closed', 'Open 24/7'][DateTime.now().hour < 22 ? 0 : 1];
+  }
+
+  static double _generateRating() {
+    return 3.0 + (DateTime.now().millisecond % 20) / 10.0;
+  }
+
+  static int _generateReviews() {
+    return 50 + (DateTime.now().millisecond % 200);
+  }
+
+  static String _generateWaitTime() {
+    final times = ['5-10 min', '15-20 min', '30-45 min', '1-2 hours'];
+    return times[DateTime.now().minute % times.length];
+  }
+
+  static bool _isEmergencyFacility(String facilityType) {
+    return facilityType.toLowerCase().contains('hospital') ||
+        facilityType.toLowerCase().contains('emergency');
+  }
+
+  static String _generatePhoneNumber() {
+    return '+237 6${DateTime.now().millisecond.toString().padLeft(8, '0')}';
+  }
+
+  static List<String> _generateServices(String facilityType) {
+    if (facilityType.toLowerCase().contains('hospital')) {
+      return ['Emergency Care', 'Surgery', 'Radiology', 'Laboratory'];
+    } else if (facilityType.toLowerCase().contains('centre')) {
+      return ['General Medicine', 'Vaccination', 'Basic Care'];
+    }
+    return ['General Medicine'];
   }
 }
 
