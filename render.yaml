@@ -2,25 +2,27 @@ services:
   - type: web
     name: novacare-disease-api
     runtime: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    buildCommand: "pip install -r requirements-disease.txt"
+    startCommand: "cd Dataset && uvicorn main:app --host 0.0.0.0 --port $PORT"
     plan: free
-    rootDir: ./Dataset
     envVars:
       - key: LOG_LEVEL
         value: INFO
       - key: PYTHONUNBUFFERED
         value: "1"
+      - key: PYTHONPATH
+        value: "/opt/render/project/src/Dataset"
 
   - type: web
     name: novacare-hospital-api
     runtime: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    buildCommand: "pip install -r requirements-hospital.txt"
+    startCommand: "cd hospital_referal && uvicorn main:app --host 0.0.0.0 --port $PORT"
     plan: free
-    rootDir: ./hospital_referal
     envVars:
       - key: LOG_LEVEL
         value: INFO
       - key: PYTHONUNBUFFERED
         value: "1"
+      - key: PYTHONPATH
+        value: "/opt/render/project/src/hospital_referal"
