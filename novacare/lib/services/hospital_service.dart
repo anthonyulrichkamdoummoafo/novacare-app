@@ -11,7 +11,7 @@ class HospitalService {
   // Render: 'https://novacare-hospital-api.onrender.com'
   // Heroku: 'https://novacare-hospital-api.herokuapp.com'
   static const String _baseUrl =
-      'http://192.168.39.111:8001'; // Change this to your cloud URL
+      'https://novacare-hospital-api1.onrender.com'; // Deployed on Render
   static const Duration _timeoutDuration = Duration(seconds: 10);
 
   final ApiClient _apiClient = ApiClient();
