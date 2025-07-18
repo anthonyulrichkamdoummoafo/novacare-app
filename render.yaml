@@ -1,12 +1,11 @@
 services:
   - type: web
     name: novacare-disease-api
-    env: python
+    runtime: python
     buildCommand: "pip install -r requirements.txt"
     startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
     plan: free
     rootDir: ./Dataset
-    pythonVersion: "3.11.0"
     envVars:
       - key: LOG_LEVEL
         value: INFO
@@ -15,12 +14,11 @@ services:
 
   - type: web
     name: novacare-hospital-api
-    env: python
+    runtime: python
     buildCommand: "pip install -r requirements.txt"
     startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
     plan: free
     rootDir: ./hospital_referal
-    pythonVersion: "3.11.0"
     envVars:
       - key: LOG_LEVEL
         value: INFO
