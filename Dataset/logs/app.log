@@ -157,3 +157,4 @@ ValueError: y should be a 1d array, got an array of shape (1, 41) instead.
 2025-07-18 02:15:35,287:INFO:Disease Prediction API is shutting down
 2025-07-18 02:19:44,332:INFO:Disease Prediction API started and ready to receive requests
 2025-07-18 02:23:34,216:INFO:Disease Prediction API is shutting down
+2025-07-18 03:47:39,057:INFO:Disease Prediction API started and ready to receive requests

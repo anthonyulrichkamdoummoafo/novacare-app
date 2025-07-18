@@ -25,3 +25,4 @@
 2025-07-18 02:52:28,089 - hospital_recommender - INFO - Returning 10 hospitals
 2025-07-18 02:52:28,091 - main - INFO - Returning 10 hospitals
 2025-07-18 02:52:45,745 - main - INFO - Hospital Referral API shutting down
+2025-07-18 03:47:25,913 - main - INFO - Hospital Referral API started

@@ -5,7 +5,13 @@ import '../utils/api_client.dart';
 import '../utils/cache_manager.dart';
 
 class HospitalService {
-  static const String _baseUrl = 'http://192.168.39.111:8001';
+  // TODO: Replace with your deployed API URL
+  // Examples:
+  // Railway: 'https://your-hospital-api.railway.app'
+  // Render: 'https://novacare-hospital-api.onrender.com'
+  // Heroku: 'https://novacare-hospital-api.herokuapp.com'
+  static const String _baseUrl =
+      'http://192.168.39.111:8001'; // Change this to your cloud URL
   static const Duration _timeoutDuration = Duration(seconds: 10);
 
   final ApiClient _apiClient = ApiClient();
