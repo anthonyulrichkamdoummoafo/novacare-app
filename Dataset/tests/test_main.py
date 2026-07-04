@@ -22,7 +22,7 @@ def test_predict_disease_empty_symptoms():
     """Test prediction with empty symptoms list"""
     response = client.post("/predict", json={"symptoms": []})
     assert response.status_code == 400
-    assert response.json()["error"] == "Symptom list cannot be empty."
+    assert response.json()["detail"] == "No valid symptoms found. Please check symptom names."
 
 def test_predict_disease_invalid_input():
     """Test prediction with invalid input format"""

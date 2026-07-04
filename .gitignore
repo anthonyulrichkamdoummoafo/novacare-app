@@ -35,3 +35,28 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# Python
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+*.log
+
+# Secrets / credentials - never commit these
+Credentials
+Credentials.*
+*.env
+.env
+!.env.example
+
+# LibreOffice/Excel lock files
+.~lock.*#
+
+# Flutter/Dart build output
+novacare/build/
+novacare/.dart_tool/
