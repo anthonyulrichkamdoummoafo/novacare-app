@@ -9,10 +9,12 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 import time
 from functools import lru_cache
+import os
 
 from model_utils import model_inference, extract_symptoms_from_text, columns
 
 # Enhanced logging configuration
+os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
