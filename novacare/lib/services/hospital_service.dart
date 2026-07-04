@@ -1,17 +1,43 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import '../models/hospital.dart';
 import '../utils/api_client.dart';
 import '../utils/cache_manager.dart';
 
 class HospitalService {
+  // Flip this to true while developing locally against
+  // `uvicorn main:app --reload --port 8001` in hospital_referal/.
+  // Set it back to false before building a release you'll hand to someone
+  // else, so it points at the deployed API instead.
+  static const bool _useLocalBackend = false;
+
+  static const int _localPort = 8001;
+
   // TODO: Replace with your deployed API URL
   // Examples:
   // Railway: 'https://your-hospital-api.railway.app'
   // Render: 'https://novacare-hospital-api.onrender.com'
   // Heroku: 'https://novacare-hospital-api.herokuapp.com'
-  static const String _baseUrl =
+  static const String _deployedBaseUrl =
       'https://novacare-hospital-api1.onrender.com'; // Deployed on Render
+
+  static String get _baseUrl {
+    if (!_useLocalBackend) return _deployedBaseUrl;
+
+    // localhost means something different depending on where the app runs:
+    // - Android emulator can't see the host machine as "localhost" - it
+    //   needs the special alias 10.0.2.2.
+    // - Web, Windows/desktop, and a physical device on the same network as
+    //   the API can use the loopback address (a physical device would
+    //   actually need your PC's real LAN IP, e.g. 192.168.x.x - swap it in
+    //   here manually if you're testing on a phone over WiFi).
+    if (!kIsWeb && Platform.isAndroid) {
+      return 'http://10.0.2.2:$_localPort';
+    }
+    return 'http://127.0.0.1:$_localPort';
+  }
+
   static const Duration _timeoutDuration = Duration(seconds: 10);
 
   final ApiClient _apiClient = ApiClient();
