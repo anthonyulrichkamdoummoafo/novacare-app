@@ -46,5 +46,8 @@ def model_inference(symptom_list):
 
 
 
+from symptom_matcher import extract_symptoms_from_text as _extract_symptoms_from_text
+
+
 def extract_symptoms_from_text(user_text):
-    return [symptom for symptom in columns if symptom.lower() in user_text.lower()]
+    return _extract_symptoms_from_text(user_text, columns)

@@ -1,7 +1,7 @@
 from sklearn.preprocessing import LabelEncoder
 import pandas as pd
 
-df = pd.read_csv("Training_with_Urgency.csv")
+df = pd.read_csv("models/Training_with_Urgency.csv")
 
 disease_encoder = LabelEncoder()
 urgency_encoder = LabelEncoder()
