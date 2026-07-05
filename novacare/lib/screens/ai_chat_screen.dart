@@ -26,14 +26,11 @@ class _AiChatScreenState extends State<AiChatScreen>
   bool _isBotTyping = false;
   late AnimationController _typingAnimationController;
 
-  // TODO: Replace with your deployed Disease API URL (see render.yaml,
-  // service name "novacare-disease-api"). This used to be hardcoded to a
-  // private LAN IP (192.168.39.111), which only ever worked on that one
-  // machine's home WiFi network - it was never reachable for real users.
-  // Examples:
-  // Render:  'https://novacare-disease-api.onrender.com'
-  // Railway: 'https://your-disease-api.railway.app'
-  static const String _baseUrl = 'https://novacare-disease-api.onrender.com';
+  // For local testing on Windows/Chrome, 127.0.0.1 works directly.
+  // For an Android emulator use 10.0.2.2; for a physical phone on the same
+  // WiFi use your PC's LAN IP (ipconfig); for production use your deployed
+  // Render URL (see render.yaml, service name "novacare-disease-api").
+  static const String _baseUrl = 'http://127.0.0.1:8000';
   final String apiUrl = '$_baseUrl/webhook';
   final String symptomsUrl = '$_baseUrl/symptoms';
 

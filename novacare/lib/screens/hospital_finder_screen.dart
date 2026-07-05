@@ -15,7 +15,11 @@ class HospitalFinderScreen extends StatefulWidget {
 }
 
 class HospitalService {
-  static const baseUrl = 'http://192.168.39.111:8001';
+  // For local testing on Windows/Chrome, 127.0.0.1 works directly.
+  // For an Android emulator use 10.0.2.2; for a physical phone on the same
+  // WiFi use your PC's LAN IP (ipconfig); for production use your deployed
+  // Render URL (see render.yaml, service name "novacare-hospital-api").
+  static const baseUrl = 'http://127.0.0.1:8001';
   static const Duration timeoutDuration = Duration(seconds: 10);
 
   static Future<List<dynamic>> fetchHospitals(double lat, double lon,
@@ -155,9 +159,11 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
   }
 
   Future<void> _loadHospitals() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final position = await _determinePosition();
+      if (!mounted) return;
       if (position == null) {
         setState(() => _isLoading = false);
         return; // permission or service disabled, stop here
@@ -168,6 +174,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
         position.longitude,
       );
 
+      if (!mounted) return;
       setState(() {
         _allHospitals = List<Map<String, dynamic>>.from(hospitals);
         _applyFilter(position); // pass position to filter
@@ -184,10 +191,11 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
         debugPrint('Error logging activity: $e');
       }
     } catch (e) {
+      if (!mounted) return;
       print('Error fetching hospitals: $e');
       _showErrorSnackBar('Failed to fetch hospitals: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
